@@ -1,0 +1,168 @@
+I"�<h3 id="前言">前言</h3>
+
+<p>Jekyll + GitHub Pages可以让你更加专注于博客内容，而不是如何搭建一个博客平台。Jekyll + GitHub Pages帮助你搭建专属于自己的个性化博客。</p>
+
+<h3 id="jekyll">Jekyll</h3>
+
+<h4 id="一jekyll是什么">一、Jekyll是什么？</h4>
+
+<blockquote>
+  <p><em>引用自官网</em>：
+ <em>Jekyll 是一个简单的博客形态的静态站点生产机器。它有一个模版目录，其中包含原始文本格式的文档，通过一个转换器（如 <a href="https://link.jianshu.com?t=http%3A%2F%2Fdaringfireball.net%2Fprojects%2Fmarkdown%2F">Markdown</a>）和我们的 <a href="https://link.jianshu.com?t=https%3A%2F%2Fgithub.com%2FShopify%2Fliquid%2Fwiki">Liquid</a> 渲染器转化成一个完整的可发布的静态网站，你可以发布在任何你喜爱的服务器上。Jekyll 也可以运行在 <a href="https://link.jianshu.com?t=http%3A%2F%2Fpages.github.com%2F">GitHub Page</a> 上，也就是说，你可以使用 GitHub 的服务来搭建你的项目页面、博客或者网站，而且是完全免费的。</em></p>
+</blockquote>
+
+<p>Jekyll就是将纯文本转化为静态博客网站，不需要数据库支持，也没有评论功能，想要评论功能的话可以借助第三方的评论服务。</p>
+
+<h4 id="二搭建本地jekyll环境">二、搭建本地Jekyll环境</h4>
+
+<p><em>注：安装jekyll会用到ruby，最好不要用系统自带的，使用系统提供的ruby会出现没有权限问题，建议使用rbenv新安装一个ruby使用。</em></p>
+
+<p>具体使用rbenv安装ruby可以参考：
+<a href="https://limemg99.club/learning/2019/02/25/Mac%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE.html">Mac环境配置</a></p>
+
+<ul>
+  <li>设置全局ruby版本
+    <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ rbenv global 2.6.0 #例如设置新安装的2.6.0版本为全局版本
+$ gem env home #验证gem
+</code></pre></div>    </div>
+  </li>
+  <li>使用gem安装Jekyll
+    <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ gem install jekyll
+</code></pre></div>    </div>
+  </li>
+  <li>安装bundler
+    <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ gem install bundler
+</code></pre></div>    </div>
+  </li>
+  <li>使用Jekyll创建博客仓库
+    <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ jekyll new myblog
+</code></pre></div>    </div>
+  </li>
+  <li>进入myblog目录 开启Jekyll服务
+    <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ cd myblog
+$ jekyll serve
+</code></pre></div>    </div>
+    <p>Jekyll服务默认端口是4000，打开浏览器，输入：<a href="http://localhost:4000">http://localhost:4000</a>就能看到一个简单的博客页面。</p>
+  </li>
+</ul>
+
+<h4 id="三jekyll的一些常用命令">三、Jekyll的一些常用命令</h4>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>当前文件夹中的内容将会生成到 ./_site 文件夹中。
+$ jekyll build
+
+当前文件夹中的内容将会生成到目标文件夹&lt;destination&gt;中。
+$ jekyll build --destination &lt;destination&gt;
+
+指定源文件夹&lt;source&gt;中的内容将会生成到目标文件夹&lt;destination&gt;中。
+$ jekyll build --source &lt;source&gt; --destination &lt;destination&gt;
+
+当前文件夹中的内容将会生成到 ./_site 文件夹中，查看改变，并且自动再生成。
+$ jekyll build --watch
+
+一个开发服务器将会运行在 http://localhost:4000/
+$ jekyll serve
+
+功能和`jekyll serve`命令相同，但是会脱离终端在后台运行。
+如果你想关闭服务器，可以使用`kill -9 1234`命令，"1234" 是进程号（PID）。
+如果你找不到进程号，那么就用`ps aux | grep jekyll`命令来查看，然后关闭服务器。
+$ jekyll serve --detach
+
+</code></pre></div></div>
+<h4 id="四jeykll的目录结构">四、Jeykll的目录结构</h4>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>├── _config.yml  			(配置文件)
+├── _drafts  				(drafts（草稿）是未发布的文章)
+|   ├── begin-with-the-crazy-ideas.textile
+|   └── on-simplicity-in-technology.markdown
+├── _includes 			(加载这些包含部分到你的布局)
+|   ├── footer.html
+|   └── header.html
+├── _layouts 			    (包裹在文章外部的模板)
+|   ├── default.html
+|   └── post.html
+├── _posts 				  (这里都是存放文章)
+|   ├── 2007-10-29-why-every-programmer-should-play-nethack.textile
+|   └── 2009-04-26-barcamp-boston-4-roundup.textile
+├── _site 				(生成的页面都会生成在这个目录下)
+├── .jekyll-metadata	  (该文件帮助 Jekyll 跟踪哪些文件从上次建立站点开始到现在没有被修改，哪些文件需要在下一次站点建立时重新生成。该文件不会被包含在生成的站点中。)
+└── index.html 		   (网站的index)
+</code></pre></div></div>
+
+<h3 id="github-pages">GitHub Pages</h3>
+
+<h4 id="一创建一个仓库">一、创建一个仓库</h4>
+
+<p>转到GitHub并创建一个名为<em>username.github.io</em>的新存储库，在Settings里面找到Github Pages，选择一个主题</p>
+
+<h4 id="二克隆仓库">二、克隆仓库</h4>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ git clone https://github.com/username/username.github.io
+</code></pre></div></div>
+
+<h4 id="三部署blog">三、部署Blog</h4>
+
+<ul>
+  <li>开启Jekyll服务</li>
+</ul>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ cd username.github.com
+
+打开http://localhost:4000,可看见我们在Github上创建的主页
+$ jekyll serve
+</code></pre></div></div>
+
+<ul>
+  <li>选择你想要的主题，进行更改，然后推送到仓库</li>
+</ul>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ git add --all
+$ git commit -m "jekyll页面"
+$ git push origin master
+</code></pre></div></div>
+
+<ul>
+  <li>_config.yml配置必须符合GitHub Pages的规定模式</li>
+</ul>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>highlighter: rouge
+markdown: kramdown
+</code></pre></div></div>
+
+<h4 id="四申请个人域名">四、申请个人域名</h4>
+
+<p>域名申请国内一般使用<a href="https://wanwang.aliyun.com/">万网</a>，国外使用<a href="https://sg.godaddy.com/">Go Daddy</a></p>
+
+<ul>
+  <li>创建CNAME(无后缀)，添加你的域名</li>
+</ul>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  $ git add CNAME
+  $ git push origin master
+</code></pre></div></div>
+
+<ul>
+  <li>域名服务商增加你的CNAME记录</li>
+</ul>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>主机记录www，记录类型为CNAME类型，CNAME表示别名记录，该记录可以将多个名字映射到同一台计算机,
+记录值请写username.github.io
+</code></pre></div></div>
+
+<h3 id="jekyllgithub-pages相关链接">Jekyll+GitHub Pages相关链接</h3>
+
+<h5 id="1-jekyll官方中文文档">1. Jekyll官方中文文档</h5>
+
+<p><a href="http://jekyllcn.com/docs/home/">Jekyll官方中文文档</a></p>
+
+<h5 id="2-github-pages官方网址">2. GitHub Pages官方网址</h5>
+
+<p><a href="https://pages.github.com/">GitHub Pages官方网址</a></p>
+
+<h5 id="3-jekyll主题网站多种个性化主题">3. Jekyll主题网站，多种个性化主题</h5>
+<p><a href="http://jekyllthemes.org/">Jekyll主题网站</a></p>
+
+<h5 id="4-冰霜之地大神的用jekyll搭建静态博客">4. 冰霜之地大神的用Jekyll搭建静态博客</h5>
+<p><a href="https://halfrost.com/jekyll/">如何快速给自己构建一个温馨的”家”——用 Jekyll 搭建静态博客</a></p>
+
+<h5 id="5疑难杂症解决链接">5.疑难杂症解决链接</h5>
+<p><a href="https://github.com/rbenv/rbenv/issues/938#issuecomment-285342541">You don’t have write permissions for the /Library/Ruby/Gems/2.0.0 directory</a></p>
+:ET
