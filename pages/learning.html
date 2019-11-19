@@ -1,0 +1,13 @@
+---
+layout: page
+title: 学习笔记
+feature-img: "assets/img/page/learn.jpg"
+subtitle: "每天进步一点点......"
+---
+{% for post in site.categories.learning %}
+  <a href="{{ site.github.url }}{{ post.url }}">
+    <div class="featured-posts" {% if post.image %}style="background-image:url({{ site.github.url }}/assets/img/{{ post.image }})"{% endif %}>
+      <h2><span>{{ post.title }}</span></h2>
+    </div>
+  </a>
+{% endfor %}
