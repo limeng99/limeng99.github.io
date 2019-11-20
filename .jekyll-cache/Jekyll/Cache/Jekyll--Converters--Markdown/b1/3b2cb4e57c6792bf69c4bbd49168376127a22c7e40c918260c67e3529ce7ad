@@ -1,4 +1,4 @@
-I"�<h4 id="一git基本命令">一、git基本命令</h4>
+I") <h4 id="一git基本命令">一、git基本命令</h4>
 
 <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>在当前目录下新建一个git仓库
 $ git init
@@ -12,10 +12,14 @@ $ git add 文件
 提交文件
 $ git commit -m "提交的信息"
 
-提交到代码到主干
+提交到代码到远程
+$ git push origin 分支名称
+提交代码到远程主干
 $ git push origin master
 
 拉取远程分支到本地
+$ git pull origin 分支名称
+拉取远程主干分支到本地
 $ git pull origin master
 
 查看仓库当前状态
@@ -26,48 +30,66 @@ $ git diff
 
 显示最近到最远的提交日志
 $ git log
+$ git log --graph  看到分支合并图
+$ git log --pretty=oneline 简化日志输出信息
 
-关联一个本地仓库到未初始化的远程仓库，例如GitHub仓库上
-$ git remote add origin git@github.com:&lt;name&gt;/&lt;name&gt;.git
-$ git push -u origin master
-
-恢复到之前提交版本
+恢复到上一个提交版本
+HEAD当前版本，HEAD^上一个版本，HEAD^^上上个版本，HEAD~100表示往上100个版本
 $ git reset --hard HEAD^(提交ID)
 
 查看命令历史以便回到未来
 $ git reflog
 
 当你改乱了工作区某个文件的内容，想直接丢弃工作区的修改时，用命令
-$ git checkout —- file
+$ git checkout -- file
 
 当你不但改乱了工作区某个文件的内容，还添加到了暂存区时，
 想丢弃修改，分两步，第一步用命令
 $ git reset HEAD file
 然后再
-$ git checkout —file
+$ git checkout -- file
+
+关联一个本地仓库到未初始化的远程仓库，例如GitHub仓库上
+$ git remote add origin git@github.com:&lt;name&gt;/&lt;name&gt;.git
+
+本地库的内容推送到远程
+$ git push -u origin 分支名称
 </code></pre></div></div>
 <h4 id="二分支">二、分支</h4>
-<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>创建一个分支并切换到此分支
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>查看当前分支，当前分支前面会标一个*号
+$ git branch
+
+创建分支
+$ git branch 分支名字
+
+删除分支，-D为强制删除
+$ git branch -d 分支名字
+$ git branch -D 分支名字
+
+checkout和switch命令都可进行分支切换
+$ git switch 分支名字
+$ git checkout 分支名字
+
+切换到master主干
+$ git switch master
+$ git checkout master
+
+创建一个分支并切换到此分支
+$ git switch -c 分支名字
 $ git checkout -b 分支名字
 
 将本地分支推送到远程服务器
 $ git push --set-upstream origin 分支名字
 
-查看当前分支
-$ git branch
-
-切换到master主干
-$ git checkout master
-
 合并分支
 $ git merge 分支名字
 $ git merge test  表示test合并到master
 
+合并分支，禁用Fast forward
+$ git merge --no-ff -m "合并信息" 分支名称
+
 放弃合并分支
 $ git merge --abort
-
-删除分支
-$ git branch -D 分支名字
 
 删除远程的一个分支
 $ git push —-delete origin 分支名字
@@ -98,12 +120,12 @@ $ git tag v0.2 commit_id
 $ git show v0.1
 
 指定标签信息
-$ git tag -a 标签名字 -m "blablabla..."
+$ git tag -a 标签名字 -m "标签说明" &lt;commit id&gt;
 
 把本地所有的tag推送到远程
 $ git push origin --tags
 
-推送一个本地标签
+推送一个本地标签到远程
 $ git push origin 标签名字
 
 获取远程tag
@@ -119,6 +141,9 @@ $ git push origin :refs/tags/标签名字
 <h4 id="四远程仓库操作">四、远程仓库操作</h4>
 <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>获取远程仓库所有的变动
 $ git fetch
+
+查看远程库信息
+$ git remote -v
 
 获取所有本地分支和远程分支
 $ git branch -a
@@ -144,7 +169,10 @@ $ git branch -vv
 $ git add .
 $ git commit -m 'update .gitignore'
 </code></pre></div></div>
+<p>GitHub各种配置忽略文件 <a href="https://github.com/github/gitignore">.gitignore</a></p>
+
 <h4 id="六关于fork的一些命令">六、关于Fork的一些命令</h4>
+
 <p>有时候Fork完原作者仓库之后，需要跟远程仓库更新同步一下，那么就需要以下几步操作</p>
 <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1.首先 把作者的仓库添加到自己的上游远程，通常命名为 upstream，操作一次就可以了
 $ git remote add upstream git@github.com:xxx/xxx.git

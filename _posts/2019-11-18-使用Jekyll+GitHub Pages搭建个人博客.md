@@ -151,7 +151,7 @@ markdown: kramdown
 记录值请写username.github.io
 ```
 
-- 要创建`A`记录，顶点域指向GitHub Pages的IP地址
+- 创建`A`记录，记录值为GitHub Pages的IP地址
 
 ```
 185.199.108.153
@@ -162,7 +162,8 @@ markdown: kramdown
 - 自定义域升级HTTPS
 
 ```
-GitHub的username.github.io仓库中，进入Settings, GitHub pages选项中勾选Enforce HTTPS选择即可。如不可勾选，请核对DNS解析中A记录中记录值是否正确
+GitHub的username.github.io仓库中，进入Settings, GitHub pages选项中勾选Enforce HTTPS选择即可。
+如不可勾选，请核对DNS解析中A记录中记录值是否正确
 ```
 
 
