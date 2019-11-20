@@ -158,9 +158,9 @@ markdown: kramdown
 
 [Jekyll官方中文文档]( http://jekyllcn.com/docs/home/)
 
-##### 2. GitHub Pages官方网址
+##### 2. GitHub Pages网址
 
-[GitHub Pages官方网址](https://pages.github.com/)
+[GitHub Pages官方网址](https://pages.github.com/)  [使用GitHub Pages帮助](https://help.github.com/en/github/working-with-github-pages)
 
 ##### 3. Jekyll主题网站，多种个性化主题
 [Jekyll主题网站](http://jekyllthemes.org/)
