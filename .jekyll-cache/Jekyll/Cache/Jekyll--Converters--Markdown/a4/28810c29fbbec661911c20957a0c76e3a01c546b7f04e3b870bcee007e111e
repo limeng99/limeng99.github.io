@@ -1,4 +1,4 @@
-I"�A<h2 id="1-遇到的问题">1. 遇到的问题</h2>
+I"qR<h2 id="1-遇到的问题">1. 遇到的问题</h2>
 <p>在项目中经常会遇到这样的问题，一个页面由于内容繁多，结构复杂，后台写了5个接口进行支持，这5个接口互相又没有什么影响，也没什么顺序，但是就是需要把这5个接口的数据全都拿到之后组合一下然后刷新页面。</p>
 
 <p>今天我们主要来谈一下怎么更好的用第的方法来实现上述需求，在iOS里面GCD技术正好可以解决这种问题，当然也有其他方式，只是GCD用起来代码更简洁，实现更优雅。</p>
@@ -30,13 +30,11 @@ dispatch_group_async(group, queue, ^{
     dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
 });
 
-
 .
 .
 . /* 中间三个请求是一模一样的，所以就先省略。 */
 .
 .
-
 
 dispatch_group_async(group, queue, ^{
         
@@ -50,7 +48,6 @@ dispatch_group_async(group, queue, ^{
         
     dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
 });
-
 
 //全部执行结束
 dispatch_group_notify(group, queue, ^{
@@ -89,12 +86,12 @@ dispatch_group_notify(group, queue, ^{
 <p>通过<code class="highlighter-rouge">dispatch_queue_create</code>函数可生成Dispatch Queue。</p>
 <ul>
   <li>生成一个Serial Dispatch串行队列
-    <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dispatch_queue_t mySerialDispatchQueue = dispatch_queue_create("club.limeng99.gcd.mySerialDispacthQueue", NULL);
+    <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dispatch_queue_t mySerialDispatchQueue = dispatch_queue_create("mySerialDispacthQueue", NULL);
 </code></pre></div>    </div>
     <p>该函数的第一个参数指定串行队列的名称，例如上面的例子，Dispatch Queue的名称推荐使用应用程序的ID这种逆序全程域名，这样命名简单易懂，方便调试，。当然你也可以设为NULL，但调试时候不是那么方便。第二个参数指定为NULL,当然你也可以设DISPATCH_QUEUE_SERIAL不过没什么意义，本身DISPATCH_QUEUE_SERIAL就是NULL，不信看API啊。</p>
   </li>
   <li>生成一个Concurrent Dispatch Queue 并行队列
-    <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code> dispatch_queue_t myConcurrentDispatchQueue = dispatch_queue_create("club.limeng99.gcd.myConcurrentDispatchQueue", DISPATCH_QUEUE_CONCURRENT);
+    <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dispatch_queue_t myConcurrentDispatchQueue = dispatch_queue_create("myConcurrentDispatchQueue", DISPATCH_QUEUE_CONCURRENT);
 </code></pre></div>    </div>
     <p>生成并行队列的时候第一个参数同上，第二个参数必须写DISPATCH_QUEUE_CONCURRENT。</p>
   </li>
@@ -293,6 +290,110 @@ dispatch_group_notify(group, queue, ^{
 });
 </code></pre></div></div>
 
-<p>通过设置<code class="highlighter-rouge">dispatch_semaphore_create</code>参数为2，利用patch Semaphore的特性<code class="highlighter-rouge">dispatch_semaphore_wait与</code>dispatch_semaphore_signal```之间有且仅有两个线程在工作，从而达到设置队列的最大并发数的目的。</p>
+<p>通过设置<code class="highlighter-rouge">dispatch_semaphore_create</code>参数为2，利用patch Semaphore的特性<code class="highlighter-rouge">dispatch_semaphore_wait</code>与<code class="highlighter-rouge">dispatch_semaphore_signal</code>之间最多有两个线程在工作，从而达到设置队列的最大并发数的目的。</p>
 
+<h3 id="25-dispatch-barrier">2.5 Dispatch Barrier</h3>
+
+<p>栅栏函数，等待在Dispatch Barrier前面插入队列的任务先执行完，再执行后面的任务。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// queue: 将barrier添加到的队列 , block: barrier执行的任务
+void dispatch_barrier_sync(dispatch_queue_t queue, dispatch_block_t block);
+void dispatch_barrier_async(dispatch_queue_t queue, dispatch_block_t block);
+</code></pre></div></div>
+
+<h4 id="251-dispatch_barrier_sync">2.5.1 dispatch_barrier_sync</h4>
+
+<p>dispatch_barrier_sync将自己的任务插入到队列的时候，需要等待自己的任务结束之后才会继续插入被写在它后面的任务，然后执行它们。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 创建Concurrent Dispatch Queue 并行队列
+dispatch_queue_t concurrentQueue = dispatch_queue_create("concurrentQueue", DISPATCH_QUEUE_CONCURRENT);
+
+// 向队列中添加任务
+dispatch_async(concurrentQueue, ^{
+   NSLog(@"第1个任务");
+});
+
+dispatch_async(concurrentQueue, ^{
+   NSLog(@"第2个任务");
+});
+
+// dispatch_barrier_sync 添加任务
+dispatch_barrier_sync(concurrentQueue, ^{
+    sleep(1);
+   NSLog(@"Dispatch Barrier任务");
+});
+
+NSLog(@"主线程任务1");
+
+dispatch_async(concurrentQueue, ^{
+    NSLog(@"第3个任务");
+});
+
+dispatch_async(concurrentQueue, ^{
+    NSLog(@"第4个任务");
+});
+
+NSLog(@"主线程任务2");
+</code></pre></div></div>
+
+<p>输出日志</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>2019-11-20 17:58:13.737806+0800 GCD-demo[51368:20064429] 第1个任务
+2019-11-20 17:58:13.737831+0800 GCD-demo[51368:20064430] 第2个任务
+2019-11-20 17:58:14.739234+0800 GCD-demo[51368:20064366] Dispatch Barrier任务
+2019-11-20 17:58:14.739529+0800 GCD-demo[51368:20064366] 主线程任务1
+2019-11-20 17:58:14.739739+0800 GCD-demo[51368:20064366] 主线程任务2
+2019-11-20 17:58:14.739773+0800 GCD-demo[51368:20064430] 第3个任务
+2019-11-20 17:58:14.739778+0800 GCD-demo[51368:20064429] 第4个任务
+</code></pre></div></div>
+
+<p>由此可见，<code class="highlighter-rouge">dispatch_barrier_sync</code>必须等待自己任务结束，才会把后续任务添加到队列，然后执行它们。</p>
+
+<h4 id="252-dispatch_barrier_async">2.5.2 dispatch_barrier_async</h4>
+
+<p>dispatch_barrier_async将自己的任务插入到队列之后，不会等待自己的任务结束，它会继续把后面的任务插入到队列，然后等待自己的任务结束后才执行后面任务。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 创建Concurrent Dispatch Queue 并行队列
+dispatch_queue_t concurrentQueue = dispatch_queue_create("concurrentQueue", DISPATCH_QUEUE_CONCURRENT);
+
+// 向队列中添加任务
+dispatch_async(concurrentQueue, ^{
+   NSLog(@"第1个任务");
+});
+
+dispatch_async(concurrentQueue, ^{
+   NSLog(@"第2个任务");
+});
+
+// dispatch_barrier_async 添加任务
+dispatch_barrier_async(concurrentQueue, ^{
+    sleep(1);
+   NSLog(@"Dispatch Barrier任务");
+});
+
+NSLog(@"主线程任务1");
+
+dispatch_async(concurrentQueue, ^{
+    NSLog(@"第3个任务");
+});
+
+dispatch_async(concurrentQueue, ^{
+    NSLog(@"第4个任务");
+});
+
+NSLog(@"主线程任务2");
+</code></pre></div></div>
+
+<p>输出日志</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>2019-11-20 17:54:05.535233+0800 GCD-demo[51346:20058026] 主线程任务1
+2019-11-20 17:54:05.535251+0800 GCD-demo[51346:20058062] 第1个任务
+2019-11-20 17:54:05.535263+0800 GCD-demo[51346:20058060] 第2个任务
+2019-11-20 17:54:05.535402+0800 GCD-demo[51346:20058026] 主线程任务2
+2019-11-20 17:54:06.539084+0800 GCD-demo[51346:20058060] Dispatch Barrier任务
+2019-11-20 17:54:06.539451+0800 GCD-demo[51346:20058062] 第4个任务
+2019-11-20 17:54:06.539438+0800 GCD-demo[51346:20058060] 第3个任务
+</code></pre></div></div>
+
+<p>由此可见，<code class="highlighter-rouge">dispatch_barrier_async</code>不会拦截后续任务加载到队列，但后续任务必须等待<code class="highlighter-rouge">dispatch_barrier_async</code>任务执行结束，后续任务才可执行</p>
 :ET
