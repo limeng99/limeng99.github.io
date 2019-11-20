@@ -137,18 +137,32 @@ markdown: kramdown
 
 域名申请国内一般使用[万网](https://wanwang.aliyun.com/)，国外使用[Go Daddy](https://sg.godaddy.com/)
 
-- 创建CNAME(无后缀)，添加你的域名
+- 创建`CNAME`，添加你的域名
 
  ```
   $ git add CNAME
   $ git push origin master
  ```
 
-- 域名服务商增加你的CNAME记录
+- DNS提供商，DNS解析创建一个`CNAME`记录
 
 ```
 主机记录www，记录类型为CNAME类型，CNAME表示别名记录，该记录可以将多个名字映射到同一台计算机,
 记录值请写username.github.io
+```
+
+- 要创建`A`记录，顶点域指向GitHub Pages的IP地址
+
+```
+185.199.108.153
+185.199.109.153
+185.199.110.153
+185.199.111.153
+```
+- 自定义域升级HTTPS
+
+```
+GitHub的username.github.io仓库中，进入Settings, GitHub pages选项中勾选Enforce HTTPS选择即可。如不可勾选，请核对DNS解析中A记录中记录值是否正确
 ```
 
 
