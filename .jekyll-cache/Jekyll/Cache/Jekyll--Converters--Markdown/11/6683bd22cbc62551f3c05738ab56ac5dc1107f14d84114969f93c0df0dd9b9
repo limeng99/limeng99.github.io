@@ -1,0 +1,23 @@
+I"1
+<ul>
+  <li><a href="#一homebrew安装">一、Homebrew安装</a></li>
+  <li><a href="#二配置ruby环境">二、配置Ruby环境</a>
+    <ul>
+      <li><a href="#21-使用rvm安装ruby">2.1 使用RVM安装Ruby</a></li>
+      <li><a href="#22-使用rbenv安装ruby">2.2 使用rbenv安装Ruby</a></li>
+      <li><a href="#23-ruby-gem命令">2.3 Ruby Gem命令</a></li>
+    </ul>
+  </li>
+  <li><a href="#三配置node环境">三、配置Node环境</a>
+    <ul>
+      <li><a href="#31-检查本地环境">3.1 检查本地环境</a></li>
+      <li><a href="#32-nvm的安装及使用">3.2 nvm的安装及使用</a>
+        <ul>
+          <li><a href="#321-安装nvm">3.2.1 安装nvm</a></li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+  <li><a href="#四配置cocoapods环境">四、配置CocoaPods环境</a></li>
+</ul>
+:ET

@@ -13,6 +13,7 @@ layout: default
   {% if page.bootstrap %}
   <div class="bootstrap-iso">
   {% endif %}
+  {% include toc.html html=content %}
     {{ content }}
   {% if page.bootstrap %}
   </div>

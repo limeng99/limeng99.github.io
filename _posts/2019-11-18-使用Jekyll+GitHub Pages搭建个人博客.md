@@ -25,8 +25,8 @@ Jekyll就是将纯文本转化为静态博客网站，不需要数据库支持�
 
 *注：安装jekyll会用到ruby，最好不要用系统自带的，使用系统提供的ruby会出现没有权限问题，建议使用rbenv新安装一个ruby使用。*
 
-具体使用rbenv安装ruby可以参考：
-[Mac环境配置](https://limemg99.club/learning/2019/02/25/Mac%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE.html)
+具体安装ruby可以参考：
+[Mac环境配置](https://limeng99.club/learning/2019/11/21/Mac%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE.html)
 
 - 设置全局ruby版本
 ```
@@ -169,19 +169,14 @@ GitHub的username.github.io仓库中，进入Settings, GitHub pages选项中勾�
 
 ### Jekyll+GitHub Pages相关链接
 
-##### 1. Jekyll官方中文文档
-
 [Jekyll官方中文文档]( http://jekyllcn.com/docs/home/)
 
-##### 2. GitHub Pages网址
+[GitHub Pages官方网址](https://pages.github.com/) 
 
-[GitHub Pages官方网址](https://pages.github.com/)  [使用GitHub Pages帮助](https://help.github.com/en/github/working-with-github-pages)
+ [使用GitHub Pages帮助](https://help.github.com/en/github/working-with-github-pages)
 
-##### 3. Jekyll主题网站，多种个性化主题
 [Jekyll主题网站](http://jekyllthemes.org/)
 
-##### 4. 冰霜之地大神的博客文章
 [如何快速给自己构建一个温馨的"家"——用 Jekyll 搭建静态博客](https://halfrost.com/jekyll/)
 
-##### 5.疑难杂症解决链接
-[You don't have write permissions for the /Library/Ruby/Gems/2.0.0 directory](https://github.com/rbenv/rbenv/issues/938#issuecomment-285342541)
+[疑难杂症解决链接](https://github.com/rbenv/rbenv/issues/938#issuecomment-285342541)

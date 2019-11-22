@@ -9,21 +9,20 @@ layout: default
     {% if page.author %} - {{ page.author }}{% endif %}
     </p>
   </header>
-  <section class="post-content">{{ content }}</section>
-  
-  <div style="display: inline-block;">
-  <!-- Social media shares -->
+  <section class="post-content">{{ include }}</section>
+
+  <div style="display: inline-block;">  
+  <!-- Social media shares -->  
   {% include share_buttons.html %}
-   
    <!-- Tag list -->
   {% capture tag_list %}{{ page.tags | join: "|"}}{% endcapture %}
   {% include tags_list.html tags=tag_list %}
     </div>
-      
 </article>
 
 <!-- Disqus -->
 {% if site.theme_settings.disqus_shortname %}
+
 <div class="comments">
   {% include disqus.html %}
 </div>

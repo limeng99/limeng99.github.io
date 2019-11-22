@@ -1,17 +1,6 @@
----
-layout: post
-title: "Git常用命令"
-author: "李萌"
-categories: learning
-tags: [learning]
-feature-img: "assets/img/article/git.jpg"
-thumbnail: "assets/img/article/git.jpg"
----
+I"1"<h4 id="一git基本命令">一、git基本命令</h4>
 
-#### 一、git基本命令
-
-```
-在当前目录下新建一个git仓库
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>在当前目录下新建一个git仓库
 $ git init
 
 克隆一个远端库
@@ -61,14 +50,13 @@ $ git reset HEAD file
 $ git checkout -- file
 
 关联一个本地仓库到未初始化的远程仓库，例如GitHub仓库上
-$ git remote add origin git@github.com:<name>/<name>.git
+$ git remote add origin git@github.com:&lt;name&gt;/&lt;name&gt;.git
 
 本地库的内容推送到远程
 $ git push -u origin 分支名称
-```
-#### 二、分支
-```
-查看当前分支，当前分支前面会标一个*号
+</code></pre></div></div>
+<h4 id="二分支">二、分支</h4>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>查看当前分支，当前分支前面会标一个*号
 $ git branch
 
 创建分支
@@ -117,10 +105,9 @@ $ git fetch -p
 1.进入 github 中该项目的 Settings 页面
 2.设置 Default Branch 为其他的分支（例如 master）
 3.重新执行删除远程分支命令
-```
-#### 三、标签
-```
-创建标签
+</code></pre></div></div>
+<h4 id="三标签">三、标签</h4>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>创建标签
 $ git tag v1.0(名字随便写)
 
 查看所有标签
@@ -133,7 +120,7 @@ $ git tag v0.2 commit_id
 $ git show v0.1
 
 指定标签信息
-$ git tag -a 标签名字 -m "标签说明" <commit id>
+$ git tag -a 标签名字 -m "标签说明" &lt;commit id&gt;
 
 把本地所有的tag推送到远程
 $ git push origin --tags
@@ -150,10 +137,9 @@ $ git tag -d v0.1
 如果一个标签已经推送到远程再删除就先删除本地标签再删除远端标签
 $ git tag -d v0.1
 $ git push origin :refs/tags/标签名字
-```
-#### 四、远程仓库操作
-```
-获取远程仓库所有的变动
+</code></pre></div></div>
+<h4 id="四远程仓库操作">四、远程仓库操作</h4>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>获取远程仓库所有的变动
 $ git fetch
 
 查看远程库信息
@@ -163,27 +149,26 @@ $ git remote -v
 $ git branch -a
 
 获取一个远程分支到本地
-$ git checkout -b <本地分支名字> origin/<远程分支名字>
+$ git checkout -b &lt;本地分支名字&gt; origin/&lt;远程分支名字&gt;
 
 本地分支关联到一个远程分支
-$ git branch --set-upstream-to=origin/<远程分支> <本地分支>
+$ git branch --set-upstream-to=origin/&lt;远程分支&gt; &lt;本地分支&gt;
 
 推送本地的分支到远程origin的分支(没有会自动创建)
-$ git push origin <本地分支>:<远程分支>
+$ git push origin &lt;本地分支&gt;:&lt;远程分支&gt;
 
 强制推送本地提交到服务器
 $ git push -f origin master
 
 git查看本地分支关联（跟踪）的远程分支之间的对应关系，本地分支对应哪个远程分支
 $ git branch -vv
-```
-#### 五、添加git忽略文件.gitignore
-在git中如果想忽略掉某个文件，不让这个文件提交到版本库中，可以在根目录中添加` .gitignore `文件。
+</code></pre></div></div>
+<h4 id="五添加git忽略文件gitignore">五、添加git忽略文件.gitignore</h4>
+<p>在git中如果想忽略掉某个文件，不让这个文件提交到版本库中，可以在根目录中添加<code class="highlighter-rouge"> .gitignore </code>文件。</p>
 
-包含CocoaPods的iOS项目 ` .gitignore ` 写法
+<p>包含CocoaPods的iOS项目 ` .gitignore ` 写法</p>
 
-```
-# Xcode
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code># Xcode
 .DS_Store
 */build/*
 *.pbxuser
@@ -208,22 +193,20 @@ DerivedData
 Pods
 !Podfile
 !Podfile.lock
-```
+</code></pre></div></div>
 
-但是有时候会不生效，原因是.gitignore只能忽略那些原来没有被track的文件，如果某些文件已经被纳入了版本管理中，则修改.gitignore是无效的。那么解决方法就是先把本地缓存删除（改变成未track状态），然后再提交：
+<p>但是有时候会不生效，原因是.gitignore只能忽略那些原来没有被track的文件，如果某些文件已经被纳入了版本管理中，则修改.gitignore是无效的。那么解决方法就是先把本地缓存删除（改变成未track状态），然后再提交：</p>
 
-```
-$ git rm -r --cached .
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ git rm -r --cached .
 $ git add .
 $ git commit -m 'update .gitignore'
-```
-GitHub各种配置忽略文件 [.gitignore](https://github.com/github/gitignore)
+</code></pre></div></div>
+<p>GitHub各种配置忽略文件 <a href="https://github.com/github/gitignore">.gitignore</a></p>
 
-#### 六、关于Fork的一些命令
+<h4 id="六关于fork的一些命令">六、关于Fork的一些命令</h4>
 
-有时候Fork完原作者仓库之后，需要跟远程仓库更新同步一下，那么就需要以下几步操作
-```
-1.首先 把作者的仓库添加到自己的上游远程，通常命名为 upstream，操作一次就可以了
+<p>有时候Fork完原作者仓库之后，需要跟远程仓库更新同步一下，那么就需要以下几步操作</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1.首先 把作者的仓库添加到自己的上游远程，通常命名为 upstream，操作一次就可以了
 $ git remote add upstream git@github.com:xxx/xxx.git
 
 2.查看远程主机状态，可以看到一个origin是你的，另外一个upstream是原作者的
@@ -233,16 +216,15 @@ $ git remote -v
 $ git fetch upstream
 
 4.merge或者rebase到自己的的分支上
-$ git merge upstream/<对应分支>
+$ git merge upstream/&lt;对应分支&gt;
 
 5.最后推送到自己的远程仓库就行了
 $ git push
-```
-#### 七、创建SSH Key
-有些 Git 服务器都会选择使用 SSH 公钥来进行授权，这样就需要配置SSH Key。
+</code></pre></div></div>
+<h4 id="七创建ssh-key">七、创建SSH Key</h4>
+<p>有些 Git 服务器都会选择使用 SSH 公钥来进行授权，这样就需要配置SSH Key。</p>
 
-```
-1.SSH公钥默认储存在账户的主目录下的 ~/.ssh 目录
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1.SSH公钥默认储存在账户的主目录下的 ~/.ssh 目录
 $ cd ~/.ssh
 
 2.查看 ~/.ssh 目录所有文件，查看是否有 id_rsa(私钥) 和 id_rsa.pub(公钥)
@@ -254,7 +236,7 @@ $ ssh-keygen -t rsa -C "youremail@example.com"
 4.查看公钥 id_rsa.pub
 $ cat ~/.ssh/id_rsa.pub
 
-5.多个ssh, 将公钥保存不同文件中, 如下 github_id_rsa & gitlab_id_rsa
+5.多个ssh, 将公钥保存不同文件中, 如下 github_id_rsa &amp; gitlab_id_rsa
 $ ssh-keygen -t rsa -C "youremail@github.com"  -f ~/.ssh/github_id_rsa
 $ ssh-keygen -t rsa -C "youremail@gitlab.com"  -f ~/.ssh/gitlab_id_rsa
 
@@ -279,20 +261,16 @@ IdentityFile ~/.ssh/github_id_rsa
 $ ssh -T youremail@github.com
 $ ssh -T youremail@gitlab.com
 同时在 ~/.ssh 目录下回生成know_hosts文件来区分不同的ssh, 使用ssh来push和pull
-```
-#### 八、配置Git别名
+</code></pre></div></div>
+<h4 id="八配置git别名">八、配置Git别名</h4>
 
-举个例子，比如吧git status 配置成 git st
-```
-$ git config --global alias.st status
-```
-git log 配置多功能提示效果
-```
-$ git config --global alias.lg "log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit"
-```
+<p>举个例子，比如吧git status 配置成 git st</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ git config --global alias.st status
+</code></pre></div></div>
+<p>git log 配置多功能提示效果</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ git config --global alias.lg "log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)&lt;%an&gt;%Creset' --abbrev-commit"
+</code></pre></div></div>
 
+<p>推荐Git教程 ：<a href="http://www.liaoxuefeng.com/wiki/0013739516305929606dd18361248578c67b8067c8c017b000">廖雪峰Git教程</a></p>
 
-
-推荐Git教程 ：[廖雪峰Git教程](http://www.liaoxuefeng.com/wiki/0013739516305929606dd18361248578c67b8067c8c017b000)
-
-
+:ET

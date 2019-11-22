@@ -4,7 +4,6 @@
 title: 李萌的博客 # site's title
 description: "" # used by search engines
 
-
 # THEME-SPECIFIC CONFIGURATION
 theme_settings:
   title: 李萌的博客 # blog's title
@@ -67,7 +66,7 @@ theme_settings:
   
   
 # PAGINATION
-paginate: 5
+paginate: 8
 paginate_path: "blog/page:num"
 
 

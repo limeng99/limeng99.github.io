@@ -1,0 +1,234 @@
+I"�,<p>从很多年前开始，CPU 的频率增长就出现停滞，转而向多核的方向发展。增加核心远远比提升制程、架构要更简单。因此多线程技术也有着越来越重要的地位。</p>
+
+<h3 id="一多线程相关知识">一、多线程相关知识</h3>
+
+<h4 id="11-进程">1.1 进程</h4>
+
+<ul>
+  <li>进程是指在系统中正在运行的一个应用程序，比如同时打开微信和Xcode，系统会分别启动2个进程;</li>
+  <li>每个进程之间是独立的，每个进程均运行在其专用且受保护的内存空间内；</li>
+</ul>
+
+<h4 id="12-线程">1.2 线程</h4>
+
+<ul>
+  <li>
+    <p>一个进程要想执行任务，必须得有线程（每一个进程至少要有一条线程)，是进程中执行运算的最小单位，是进程中的一个实体，是被系统独立调度和分派的基本单位；</p>
+  </li>
+  <li>
+    <p>一个程序有且只有一个主线程，程序启动时创建（调用<code class="highlighter-rouge">main</code>来启动），主线程的生命周期是和应用程序绑定，程序退出时，主线程也停止；</p>
+  </li>
+</ul>
+
+<h4 id="13-多线程">1.3 多线程</h4>
+
+<ul>
+  <li>概念：一个进程中可以开启多条线程，每一条线程可以并行（同时）执行不同的任务</li>
+  <li>原理：同一时间，CPU只能处理一条线程，只有一条线程在工作，多线程并发（同时）执行，其实是CPU快速的在多条线程之间调度（切换），如果CPU调度线程的时间足够快，就造成了多线程并发执行的假象</li>
+  <li>注意：如果线程很多，CPU会在N多线程之间调度，会消耗大量CPU资源，每条线程被调度执行的频次会降低（线程的执行效率会降低)</li>
+</ul>
+
+<h4 id="14-多线程的优缺点">1.4 多线程的优缺点</h4>
+
+<ul>
+  <li>
+    <p>优点: 能适当的提高程序的执行效率以及资源利用率（CPU、内存利用率）</p>
+  </li>
+  <li>
+    <p>缺点: 每创建一个线程是会占用资源的，比如内存开销等；线程太多，会降低程序的性能； 程序开发复杂度上升</p>
+  </li>
+</ul>
+
+<h4 id="15-主线程">1.5 主线程</h4>
+
+<ul>
+  <li>
+    <p>一个iOS程序运行后，默认会开启1条线程，称为“主线程”或“UI线程”</p>
+  </li>
+  <li>
+    <p>作用: 显示／刷新UI界面, 处理UI事件（点击事件，滚动事件，拖拽事件）</p>
+  </li>
+  <li>
+    <p>使用注意:不要将耗时的操作放到主线程中，耗时操作应放在子线程（后台线程，非主线程); 凡是和UI相关的操作应放在主线程中操作</p>
+  </li>
+</ul>
+
+<h4 id="16-ios中多线程的实现方案">1.6 iOS中多线程的实现方案</h4>
+
+<ul>
+  <li>pthread ：一套通用的多线程API，很少用到，c语言，线程生命周期由程序员管理。</li>
+  <li>NSTread：oc语言，面向对象，简单易用，可直接操作线程对象 ，线程生命周期由程序员管理</li>
+  <li>GCD:   常用，替代NSThread等线程技术，充分利用设备的多核，c语言，线程生命周期自动管理</li>
+  <li>NSOperation:  常用，是对GCD封装，使用更加面向对象，线程生命周期自动管理</li>
+</ul>
+
+<h3 id="二pthreads">二、Pthreads</h3>
+
+<p>Pthreads 是POSIX 多线程开发框架，是跨平台的 C 语言框架,需要自己管理线程的创建销毁等操作。这些 API 全都以 <code class="highlighter-rouge">pthread_</code> 作为前缀。iOS 中 CFRunLoop就是基于Pthreads来管理的。更加详细的关于 Pthreads的学习可以参考 <a href="https://computing.llnl.gov/tutorials/pthreads/">这里</a></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pthread_create()：创建一个线程
+pthread_exit()：终止当前线程
+pthread_cancel()：中断另外一个线程的运行
+pthread_join()：阻塞当前的线程，直到另外一个线程运行结束
+pthread_attr_init()：初始化线程的属性
+pthread_attr_setdetachstate()：设置脱离状态的属性（决定这个线程在终止时是否可以被结合）
+pthread_attr_getdetachstate()：获取脱离状态的属性
+pthread_attr_destroy()：删除线程的属性
+pthread_kill()：向线程发送一个信号
+pthread_equal(): 对两个线程的线程标识号进行比较
+pthread_detach(): 分离线程
+pthread_self(): 查询线程自身线程标识号
+...
+</code></pre></div></div>
+
+<h3 id="三nsthread">三、NSThread</h3>
+
+<p>一个NSThread对象就代表一条线程</p>
+
+<h4 id="31--nsthread常用方法">3.1  NSThread常用方法</h4>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 创建、启动线程
+NSThread *thread = [[NSThread alloc] initWithTarget:self selector:@selector(run) object:nil];
+[thread start];
+
+// 创建线程后自动启动线程
+[NSThread detachNewThreadSelector:@selector(run:) toTarget:self withObject:@"OC"];
+
+// 隐式创建并启动线程
+[self performSelectorInBackground:@selector(run:) withObject:@"OC"];
+
+// 主线程相关用法
+[NSThread mainThread]; 		// 获得主线程
+[NSThread isMainThread]; 	// 是否为主线程
+[thread isMainThread]; 		// 是否为主线程
+
+// 获得当前线程
+NSThread *current = [NSThread currentThread];
+
+// 休眠线程
+[NSThread sleepForTimeInterval:2];  //休眠2s
+[NSThread sleepUntilDate:[NSDate dateWithTimeIntervalSinceNow:2]]; //休眠2s
+
+// 强制退出线程，不推荐使用此方式退出子线程,可能会造成内存泄漏
+[NSThread exit];
+</code></pre></div></div>
+
+<h4 id="32--nsthread创建常驻线程">3.2  NSThread创建常驻线程</h4>
+
+<p>当然，我们也可以增加一个特殊的线程常驻RunLoop，防止线程退出。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>NSThread *runLoopThread = [[NSThread alloc] initWithTarget:self selector:@selector(onRunLoop) object:nil];
+[runLoopThread start];
+[self performSelector:@selector(dothingOnRunLoop:) onThread:runLoopThread withObject:@[@"常驻RunLoop线程"] waitUntilDone:YES];
+
+// 常驻runLoop
+- (void)onRunLoop {
+    @autoreleasepool {
+        [NSThread currentThread].name = @"常驻RunLoop线程";
+        NSRunLoop *runLoop = [NSRunLoop currentRunLoop];
+        [runLoop addPort:[NSPort port] forMode:NSDefaultRunLoopMode];
+        [runLoop run];
+    }
+}
+
+// 在runloop上执行操作
+- (void)dothingOnRunLoop:(id)param {
+    // 可以在此打断点测试线程是否已经加入runloop
+    NSLog(@"跑在runloop上的线程: %@", param);
+}
+</code></pre></div></div>
+
+<h4 id="33-nsthread线程间通讯">3.3 NSThread线程间通讯</h4>
+
+<p>NSThread通过以下四种方式进行线程之间的通信</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 指定方法在主线程中执行, 参数1. SEL 方法  2.方法参数  3.是否等待当前执行完毕 4.指定的Runloop model
+- (void)performSelectorOnMainThread:(SEL)aSelector withObject:(nullable id)arg waitUntilDone:(BOOL)wait modes:(nullable NSArray&lt;NSString *&gt; *)array;
+- (void)performSelectorOnMainThread:(SEL)aSelector withObject:(nullable id)arg waitUntilDone:(BOOL)wait;
+
+// 指定方法在某个线程中执行, 参数1. SEL 方法  2.方法参数 3.是否等待当前执行完毕 4.指定的Runloop model
+- (void)performSelector:(SEL)aSelector onThread:(NSThread *)thr withObject:(nullable id)arg waitUntilDone:(BOOL)wait modes:(nullable NSArray&lt;NSString *&gt; *)array 
+- (void)performSelector:(SEL)aSelector onThread:(NSThread *)thr withObject:(nullable id)arg waitUntilDone:(BOOL)wait 
+
+// 指定方法在开启的子线程中执行, 1. SEL 方法 2.方法参数
+- (void)performSelectorInBackground:(SEL)aSelector withObject:(nullable id)arg 
+</code></pre></div></div>
+
+<h3 id="四gcd">四、GCD</h3>
+
+<p>有关GCD相关内容，请参考另一篇文章 <a href="[https://limeng99.club/learning/2019/11/20/%E5%85%B3%E4%BA%8EGCD%E7%9A%84%E9%82%A3%E4%BA%9B%E4%BA%8B%E5%84%BF.html](https://limeng99.club/learning/2019/11/20/关于GCD的那些事儿.html)">关于GCD的那些事儿</a></p>
+
+<h3 id="五nsoperationnsoperationqueue">五、NSOperation、NSOperationQueue</h3>
+
+<p>有关NSOperation、NSOperationQueue相关内容，请参考另一篇文章 <a href="[https://limeng99.club/learning/2019/11/20/%E5%85%B3%E4%BA%8EGCD%E7%9A%84%E9%82%A3%E4%BA%9B%E4%BA%8B%E5%84%BF.html](https://limeng99.club/learning/2019/11/22/iOS多线程：NSOperation、NSOperationQueue总结.html)">iOS多线程：NSOperation、NSOperationQueue总结</a></p>
+
+<h3 id="六-多线程的安全隐患">六、 多线程的安全隐患</h3>
+
+<p>一块资源可能会被多个线程共享，也就是多个线程可能会访问同一块资源；或者说是多个线程访问同一个对象、变量、文件等等。这时候，如果不采取一定的措施，很容易引发数据错乱和数据安全的问题。</p>
+
+<p>举个例子，银行账目上原先有1000，在取钱500的同时，又存钱500，这时候大家第一时间就是觉得，还剩余1000，这只是正常现象，如果存取操作同时进行的话，因为基础都是1000，所以，取完钱剩余500，存完钱剩余1500，这两个数据任何一个放回账目上都是不正确的。这就是多条线程同时操作一个对象所引发的问题。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>- (void)moneyTest {
+    self.money = 100;
+    
+    dispatch_queue_t queue = dispatch_get_global_queue(0, 0);
+    // 存钱任务
+    dispatch_async(queue, ^{
+        for (int i = 0; i &lt; 10; i++) {
+            [self __saveMoney];
+        }
+    });
+    
+    // 取钱任务
+    dispatch_async(queue, ^{
+        for (int i = 0; i &lt; 10; i++) {
+            [self __drawMoney];
+        }
+    });
+}
+
+// 存钱
+- (void)__saveMoney
+{
+    int oldMoney = self.money;
+    sleep(.2);
+    oldMoney += 50;
+    self.money = oldMoney;
+    NSLog(@"存50，还剩%d元 - %@", oldMoney, [NSThread currentThread]);
+}
+
+// 取钱
+- (void)__drawMoney {
+    int oldMoney = self.money;
+    sleep(.2);
+    oldMoney -= 20;
+    self.money = oldMoney;
+    NSLog(@"取20，还剩%d元 - %@", oldMoney, [NSThread currentThread]);
+}
+
+</code></pre></div></div>
+
+<p>最终日志：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>2019-11-22 17:05:18.577892+0800 多线程-demo[67341:21672333] 存50，还剩440元 - &lt;NSThread: 0x600001807740&gt;{number = 6, name = (null)}
+</code></pre></div></div>
+<p>在正常流程下，最后的结果是钱剩余400，票剩余0，可以看到，钱最终的结果是错的，这就是多线程同事操作同一个对象或者方法造成的隐患。这个，我们解决问题的方案就是：使用线程同步技术（同步，就是协同步调，按预定的先后次序进行）。而在iOS领域中，常见的线程同步技术就是：加锁。</p>
+
+<p>先来看看我们iOS线程同步技术的一些方案，也就是我们接下来要分析的方案：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 性能从高到低排序
+os_unfair_lock
+OSSpinLock
+dispatch_semaphore
+pthread_mutex
+dispatch_queue(DISPATCH_QUEUE_SERIAL)
+NSLock
+NSCondition
+NSRecursiveLock
+NSConditionLock
+@synchronized
+</code></pre></div></div>
+
+<p>OSSpinLock，这个方案已经被苹果废弃，当然，现在仍然可用，只是苹果不推荐使用。</p>
+
+:ET
