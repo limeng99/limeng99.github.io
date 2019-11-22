@@ -1,4 +1,4 @@
-I"2=<p>从很多年前开始，CPU 的频率增长就出现停滞，转而向多核的方向发展。增加核心远远比提升制程、架构要更简单。因此多线程技术也有着越来越重要的地位。</p>
+I"�C<p>从很多年前开始，CPU 的频率增长就出现停滞，转而向多核的方向发展。增加核心远远比提升制程、架构要更简单。因此多线程技术也有着越来越重要的地位。</p>
 
 <h3 id="一多线程相关知识">一、多线程相关知识</h3>
 
@@ -312,7 +312,6 @@ NSConditionLock
 
 最终打印结果如下：
 2019-11-22 17:13:18.577892+0800 多线程-demo[67341:21672333] 取20，还剩400元 - &lt;NSThread: 0x600001807740&gt;{number = 7, name = (null)}
-钱的结果正是我们想要的，并且是正确的结果
 </code></pre></div></div>
 
 <h4 id="64-pthread_mutex">6.4 pthread_mutex</h4>
@@ -366,7 +365,56 @@ NSConditionLock
 
 最终打印结果如下：
 2019-11-22 17:18:18.577892+0800 多线程-demo[67341:21672333] 取20，还剩400元 - &lt;NSThread: 0x600001807740&gt;{number = 6, name = (null)}
-钱的结果正是我们想要的，并且是正确的结果
 </code></pre></div></div>
+
+<h4 id="65-dispatch_semaphore">6.5 dispatch_semaphore</h4>
+
+<p>GCD中的信号量dispatch_semaphore，这也是同步技术方案中，比较方便的一直方案。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>@interface GCDSemaphoreDemo ()
+
+@property (nonatomic, strong) dispatch_semaphore_t semaphore;
+
+@end
+
+
+@implementation GCDSemaphoreDemo
+
+- (instancetype)init {
+    if (self = [super init]) {
+        self.semaphore = dispatch_semaphore_create(1);
+    }
+    return self;
+}
+
+- (void)__drawMoney {
+    dispatch_semaphore_wait(self.semaphore, DISPATCH_TIME_FOREVER);
+    
+    [super __drawMoney];
+    
+    dispatch_semaphore_signal(self.semaphore);
+}
+
+- (void)__saveMoney {
+    dispatch_semaphore_wait(self.semaphore, DISPATCH_TIME_FOREVER);
+    
+    [super __saveMoney];
+    
+    dispatch_semaphore_signal(self.semaphore);
+}
+
+@end
+
+最终打印结果如下：
+2019-11-22 20:43:02.167794+0800 多线程-demo[80757:22055581] 取20，还剩400元 - &lt;NSThread: 0x600002f94e00&gt;{number = 3, name = (null)}
+</code></pre></div></div>
+
+<h4 id="66--其它方案">6.6  其它方案</h4>
+
+<p>NSCondition，其实就是对pthread_cond_t加pthread_mutex_t的封装使用，而NSConditionLock，则是对NSCondition的进一步封装。</p>
+
+<p>对于dispatch_queue(DISPATCH_QUEUE_SERIAL)大家都知道，因为串行队列，不管你是同步还是异步，它都是依次执行任务的，所以可以达到加锁效果。</p>
+
+<p>对于@synchronized，可能大家在日常的项目中已经有所用到，大概就是@synchronized(self)，其实，在（）中，只要是同一个对象，就可以达到加锁的效果，这里我就不做过多说明了，但是这个加锁方式性能上不是很好，因为这简单一句话，封装了很多内容，不建议大家使用。</p>
 
 :ET

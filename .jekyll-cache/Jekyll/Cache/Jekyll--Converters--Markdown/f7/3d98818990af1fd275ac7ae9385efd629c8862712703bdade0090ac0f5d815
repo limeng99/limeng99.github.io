@@ -1,4 +1,4 @@
-I"]
+I"*
 <ul>
   <li><a href="#一多线程相关知识">一、多线程相关知识</a>
     <ul>
@@ -25,6 +25,9 @@
       <li><a href="#61-ios多线程安全问题及方案">6.1 iOS多线程安全问题及方案</a></li>
       <li><a href="#62-osspinlock">6.2 OSSpinLock</a></li>
       <li><a href="#63-os_unfair_lock">6.3 os_unfair_lock</a></li>
+      <li><a href="#64-pthread_mutex">6.4 pthread_mutex</a></li>
+      <li><a href="#65-dispatch_semaphore">6.5 dispatch_semaphore</a></li>
+      <li><a href="#66--其它方案">6.6  其它方案</a></li>
     </ul>
   </li>
 </ul>

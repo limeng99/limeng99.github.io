@@ -1,4 +1,4 @@
-I"�Y<h2 id="1-遇到的问题">1. 遇到的问题</h2>
+I"�Y<h2 id="1-遇到的问题">1. 遇到的问题</h2>
 <p>在项目中经常会遇到这样的问题，一个页面由于内容繁多，结构复杂，后台写了5个接口进行支持，这5个接口互相又没有什么影响，也没什么顺序，但是就是需要把这5个接口的数据全都拿到之后组合一下然后刷新页面。</p>
 
 <p>今天我们主要来谈一下怎么更好的用第的方法来实现上述需求，在iOS里面GCD技术正好可以解决这种问题，当然也有其他方式，只是GCD用起来代码更简洁，实现更优雅。</p>
@@ -257,7 +257,7 @@ dispatch_group_notify(group, queue, ^{
 <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>//创建信号量，参数：信号量的初值，如果小于0则会返回NULL
 dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
-//等待降低信号量，等待时间为DISPATCH_TIME_FOREVER时即永久，直到信号量大于或等于1
+//等待降低信号量，等待时间为DISPATCH_TIME_FOREVER时即永久，直到信号量大于或等于1，函数会对信号量的值进行减1操作，然后返回
 dispatch_semaphore_wait（信号量，等待时间）
 
 //信号量加1
@@ -300,7 +300,7 @@ dispatch_semaphore_signal(信号量)
 <h4 id="242-dispatch_semaphore_t设置最大并发数">2.4.2 dispatch_semaphore_t设置最大并发数</h4>
 
 <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>//获取一下系统提供的全局队列DISPATCH_QUEUE_CONCURRENT 生成一个并发队列
-dispatch_queue_t queue = dispatch_queue_create("club.limeng99.gcd.myConcurrentDispatchQueue", DISPATCH_QUEUE_CONCURRENT);
+dispatch_queue_t queue = dispatch_queue_create("myConcurrentDispatchQueue", DISPATCH_QUEUE_CONCURRENT);
 
 //创建一个Dispatch Semaphore初始值为2
 dispatch_semaphore_t semaphore = dispatch_semaphore_create(2);
@@ -310,11 +310,11 @@ dispatch_group_t group = dispatch_group_create();
  
 for (int i = 0; i &lt; 10; i++) {
     dispatch_group_async(group, queue, ^{
-    		dispatch_semaphore_wait(semap, DISPATCH_TIME_FOREVER);
+    		dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
     		
     		// 线程操作区域 最多有两个线程在此工作
     		
-    		dispatch_semaphore_signal(semap);
+    		dispatch_semaphore_signal(semaphore);
     });
 }
 
