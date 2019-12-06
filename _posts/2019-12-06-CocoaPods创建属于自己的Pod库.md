@@ -8,8 +8,6 @@ feature-img: "assets/img/article/pod.jpg"
 thumbnail: "assets/img/article/pod.jpg"
 ---
 
-### 前言
-
 项目想要模块化、组件化，就必须了解如何创建CocoaPods库，如何创建CocoaPods库呢，今天我们就来动手开始从头建立属于自己的CocoaPods库吧！
 
 ### 创建公有pod库

@@ -8,8 +8,6 @@ feature-img: "assets/img/article/jekyll.jpg"
 thumbnail: "assets/img/article/jekyll.jpg"
 ---
 
-### 前言
-
 Jekyll + GitHub Pages可以让你更加专注于博客内容，而不是如何搭建一个博客平台。Jekyll + GitHub Pages帮助你搭建专属于自己的个性化博客。
 
 ### Jekyll
