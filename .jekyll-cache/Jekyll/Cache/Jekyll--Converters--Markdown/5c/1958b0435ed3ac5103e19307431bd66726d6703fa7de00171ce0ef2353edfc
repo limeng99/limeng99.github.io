@@ -1,0 +1,24 @@
+I"�
+<ul>
+  <li><a href="#前言">前言</a></li>
+  <li><a href="#创建公有pod库">创建公有pod库</a>
+    <ul>
+      <li><a href="#1-注册cocoapods账户信息已注册过请略过">1. 注册CocoaPods账户信息(<strong>已注册过请略过)</strong></a></li>
+      <li><a href="#2-创建共享库文件-上传到公有仓库">2. 创建共享库文件, 上传到公有仓库</a></li>
+      <li><a href="#3-编辑podspec文件">3. 编辑*.podspec文件</a></li>
+      <li><a href="#4-给仓库打tag">4. 给仓库打Tag</a></li>
+      <li><a href="#5-发布-podspec">5. 发布 *.podspec</a></li>
+      <li><a href="#6-使用仓库">6. 使用仓库</a></li>
+      <li><a href="#7-更新维护">7. 更新维护</a></li>
+      <li><a href="#8-遇到的问题">8. 遇到的问题</a>
+      - {:.} <a href="#error--ios--xcodebuild-returned-an-unsuccessful-exit-code">ERROR | [iOS]  <code class="highlighter-rouge">xcodebuild: Returned an unsuccessful exit code.</code></a></li>
+    </ul>
+  </li>
+  <li><a href="#创建私有库">创建私有库</a>
+    <ul>
+      <li><a href="#1-创建一个git仓库用来做内部私有库的spec-repo">1. 创建一个git仓库用来做内部私有库的Spec Repo</a></li>
+    </ul>
+  </li>
+  <li><a href="#2-创建">2. 创建</a></li>
+</ul>
+:ET

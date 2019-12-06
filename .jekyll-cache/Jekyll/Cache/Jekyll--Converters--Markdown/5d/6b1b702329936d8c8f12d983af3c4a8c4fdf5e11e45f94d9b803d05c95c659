@@ -1,0 +1,108 @@
+I"�<h3 id="前言">前言</h3>
+
+<p>项目想要模块化、组件化，就必须了解如何创建CocoaPods库，如何创建CocoaPods库呢，今天我们就来动手开始从头建立属于自己的CocoaPods库吧！</p>
+
+<h3 id="创建公有pod库">创建公有pod库</h3>
+
+<h4 id="1-注册cocoapods账户信息已注册过请略过">1. 注册CocoaPods账户信息(<strong>已注册过请略过)</strong></h4>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 创建一个开源pod库, 首先我们需要注册CocoaPods账户, 使用trunk方式在终端执行:
+$ pod trunk register '邮箱地址' '用户名'  --description=‘描述内容’ --verbose
+
+// 可以使用GitHub邮箱和用户名, 然后在你的邮箱中会收到确认邮件在浏览器中点击链接确认即注册成功, 
+   成功之后可以终端执行:
+$ pod trunk me
+</code></pre></div></div>
+
+<h4 id="2-创建共享库文件-上传到公有仓库">2. 创建共享库文件, 上传到公有仓库</h4>
+
+<p>在<a href="https://links.jianshu.com/go?to=https%3A%2F%2Fgithub.com%2F">GitHub</a>上创建一个公开项目，创建指南 <a href="https://guides.cocoapods.org/making/using-pod-lib-create.html">Using Pod Lib Create</a></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 如果自己新建的库，可以用下面代码创建
+$ pod lib create 库名
+
+项目中必须包含这几个文件：
+1. 共享文件夹：文件夹存放着你要共享的内容, 也就是其他人pod得到的文件, .podspec文件中的
+   source_files需要指定此文件路径及文件类型
+2. LICENSE：开源许可证，默认一般选择MIT;
+3. README.md：仓库说明
+4. 库描述文件.podspec：本库的各项信息描述, 需要提交给CocoaPods, pod通过这个文件查找到你共享的库.
+</code></pre></div></div>
+
+<p>然后可以使用<a href="https://www.sourcetreeapp.com/">SourceTree</a>等工具上传你的代码到公共仓库, 或使用命令行上传代码到远端仓库, 如何操作可以移步:<a href="https://limeng99.club/learning/2019/11/19/Git%E5%B8%B8%E7%94%A8%E5%91%BD%E4%BB%A4.html">Git常用命令</a>.</p>
+
+<h4 id="3-创建podspec文件">3. 创建*.podspec文件</h4>
+
+<p><code class="highlighter-rouge">.podspec</code>是用<code class="highlighter-rouge">Ruby</code>的配置文件，描述你项目的信息</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ pod spec create 库名
+</code></pre></div></div>
+
+<p>1.1 解决方法</p>
+
+<p>说到用GCD来解决，其实也有很多解决方法，我们先来说一种解决方法</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>//获取一下系统提供的全局队列
+dispatch_queue_t queue =  dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+
+//新建一个组
+dispatch_group_t group = dispatch_group_create();
+
+dispatch_group_async(group, queue, ^{
+        
+    //创建一个计数信号Dispatch Semaphore 初始值设为0
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+        
+    //发起第一个网络请求
+    [Network GET:@"api" completion:^(id  _Nonnull result) {
+        
+        NSLog(@"网络请求1,执行完成");
+        
+        //将Dispatch Semaphore计数信号值加1 这个要写到网络请求的回调里，无论成功失败。
+        dispatch_semaphore_signal(semaphore);
+
+    }];
+    
+    //一直等待，直到Dispatch Semaphore的计数值达到大于等于1
+    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+});
+
+.
+.
+. /* 中间三个请求是一模一样的，所以就先省略。 */
+.
+.
+
+dispatch_group_async(group, queue, ^{
+        
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+        
+    //发起第5个网络请求 
+    [Network GET:@"api" completion:^(id  _Nonnull result) {
+        NSLog(@"网络请求5,执行完成");
+        dispatch_semaphore_signal(semaphore);
+    }];
+        
+    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+});
+
+//全部执行结束
+dispatch_group_notify(group, queue, ^{
+    NSLog(@"请求全部执行结束");
+});
+
+</code></pre></div></div>
+<p>日志输出</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>2019-11-19 20:04:36.258363+0800 GCD-demo[8104:784197] 网络请求3,执行完成
+2019-11-19 20:04:36.258383+0800 GCD-demo[8104:784200] 网络请求5,执行完成
+2019-11-19 20:04:36.258418+0800 GCD-demo[8104:784198] 网络请求1,执行完成
+2019-11-19 20:04:36.258425+0800 GCD-demo[8104:784196] 网络请求2,执行完成
+2019-11-19 20:04:36.258429+0800 GCD-demo[8104:784199] 网络请求4,执行完成
+2019-11-19 20:04:36.258642+0800 GCD-demo[8104:784163] 请求全部执行结束
+</code></pre></div></div>
+
+<p>以上就是GCD异步并发实现五个请求的一种方法。</p>
+
+<p>下面我们解释一下这种方法为什么要这么写，实现原理，以及各个GCD中函数的含义及用法。</p>
+
+:ET
