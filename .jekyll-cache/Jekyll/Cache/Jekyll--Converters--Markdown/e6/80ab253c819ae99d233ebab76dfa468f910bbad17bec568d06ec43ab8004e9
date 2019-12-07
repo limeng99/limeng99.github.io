@@ -1,22 +1,10 @@
----
-layout: post
-title: "Xcode的Build Settings分析"
-author: "李萌"
-categories: learning
-tags: [learning]
-feature-img: "assets/img/article/xcode.jpg"
-thumbnail: "assets/img/article/xcode.jpg"
-typora-root-url: ../assets
----
+I"�<p>开发之余，对于Xcode工程配置中Build Settings了解不够清晰准确，通过查阅资料，希望能够通过这篇文章加深Build Setting的理解，并记录分享。</p>
 
-开发之余，对于Xcode工程配置中Build Settings了解不够清晰准确，通过查阅资料，希望能够通过这篇文章加深Build Setting的理解，并记录分享。
+<h3 id="1-architectures">1. Architectures</h3>
 
-### 1. Architectures
+<p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-architectures.png" alt="xcode-architectures" /></p>
 
-![xcode-architectures](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-architectures.png)
-
-```
-Additional SDKs : 在编译时要附加的SDK。
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Additional SDKs : 在编译时要附加的SDK。
 
 Architectures : 支持的处理器架构。支持的指令集越多，就会编译出包含多个指令集代码的数据包，对应生成二进制包就
 会越大，最终目标文件也会变大。
@@ -31,12 +19,11 @@ Supported Platform : App支持的平台。
 
 Valid Architectures : 限制可能被支持的指令集的范围，也就是Xcode编译出来的二进制包类型最终从这些类型产生，而
 编译出哪种指令集的包，将由Architectures与Valid Architectures（因此这个不能为空）的交集来确定。
-```
+</code></pre></div></div>
 
-Valid Architectures指令集代表什么？
+<p>Valid Architectures指令集代表什么？</p>
 
-```
-armv7｜armv7s｜arm64都是ARM处理器的指令集
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>armv7｜armv7s｜arm64都是ARM处理器的指令集
 i386｜x86_64 是Mac处理器的指令集
 i386是针对intel通用微处理器32位处理器
 x86_64是针对x86架构的64位处理器
@@ -48,39 +35,36 @@ armv7：iPhone4｜iPhone4S｜iPad｜iPad2｜iPad3(The New iPad)｜iPad mini｜iP
 
 模拟器32位处理器测试需要i386架构，模拟器64位处理器测试需要x86_64架构，
 真机32位处理器需要armv7,或者armv7s架构，真机64位处理器需要arm64架构。
-```
+</code></pre></div></div>
 
-### 2. Assets
+<h3 id="2-assets">2. Assets</h3>
 
-![xcode-assets](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-assets.png)
+<p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-assets.png" alt="xcode-assets" /></p>
 
-```
-Asset Pack Manifest URL Prefix : 资源包清单的下载路径URL前缀
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Asset Pack Manifest URL Prefix : 资源包清单的下载路径URL前缀
 Embed Asset Packs In Product Bundle : 是否将资源包嵌入产品的bundle中
 Enable On Demand Resources : 是否开启按需获取资源功能
 On Demand Resources Initial Install Tags : 按需加载资源时的初始安装资源文件标签
 On Demand Resources Prefetch Order : 按需加载资源时预加载的标签顺序
-```
+</code></pre></div></div>
 
-### 3. Build Locations
+<h3 id="3-build-locations">3. Build Locations</h3>
 
-![xcode-locations](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-locations.png)
+<p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-locations.png" alt="xcode-locations" /></p>
 
-```
-Build Products Paths : 产品文件和编译中间文件的根目录。产品文件和编译时临时文件都将放在这个目录的子目录中。
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Build Products Paths : 产品文件和编译中间文件的根目录。产品文件和编译时临时文件都将放在这个目录的子目录中。
 
 Intermediate Build Files Path : 编译时临时文件的存放位置。编译中间文件格式为product name+.build，
 如MyProduct.build。
 
 Per-configuration Build Products Path : 当前编译设置下的产品存放位置。
-```
+</code></pre></div></div>
 
-### 4. Build Options
+<h3 id="4-build-options">4. Build Options</h3>
 
-![xcode-options](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-options.png)
+<p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-options.png" alt="xcode-options" /></p>
 
-```
-Always Embed Swift Standard Libraries : 始终嵌入swift标准库。对于未使用swift代码的情况可以设置为NO。
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Always Embed Swift Standard Libraries : 始终嵌入swift标准库。对于未使用swift代码的情况可以设置为NO。
 
 Build Libraries for Distribution : Xcode11新增，构建库时选择Yes。
 
@@ -117,5 +101,6 @@ Require Only App-Extension-Safe API : 如果我们要想应用扩展使用内嵌
 Scan All Source Files for Includes : 扫描include文件所包含的所有源文件。
 
 Validate Built Product : 这个选项决定了是否在编译的时候进行验证。验证的内容和app store的审查内容一致。默认选项是debug时不验证，release时验证。
-```
+</code></pre></div></div>
 
+:ET

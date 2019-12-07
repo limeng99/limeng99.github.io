@@ -1,4 +1,4 @@
-I"�<p>开发之余，对于Xcode工程配置中Build Settings了解不够清晰准确，通过查阅资料，希望能够通过这篇文章加深Build Setting的理解，并记录分享。</p>
+I"�<p>开发之余，对于Xcode工程配置中Build Settings了解不够清晰准确，通过查阅资料，希望能够通过这篇文章加深Build Setting的理解，并记录分享。</p>
 
 <h3 id="1-architectures">1. Architectures</h3>
 
@@ -58,6 +58,24 @@ Per-configuration Build Products Path : 当前编译设置下的产品存放位�
 <p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-options.png" alt="xcode-options" /></p>
 
 <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Always Embed Swift Standard Libraries : 始终嵌入swift标准库。对于未使用swift代码的情况可以设置为NO。
+Build Libraries for Distribution : Xcode11新增，构建库时选择Yes。
+Build Variants : 此项可以设定生成产品的变种。您可以创建额外的产品变种作为特殊用途。例如，您可以使用编译配置
+文件的名称来创建一个高度定制的二进制文件。
+Build Variants的值有三个 : 
+	normal-用于生成普通的二进制文件；
+	profile-用于可以生成配置信息的二进制文件；
+	debug-用于生成带有debug标志、额外断言和诊断代码的二进制文件。
+Compiler For C/C++/Objective-C : 选择使用的编译器。
+Debug Information Format : 记录debug信息的文件格式。共有DWARF with dSYM File和DWARF两种可以选择。建议
+选择DWARF with dSYM File。DWARF是较老的文件格式，会在编译时将debug信息写在执行文件中。
+Enable BitCode : bitcode是被编译程序的一种中间形式的代码。包含bitcode配置的程序将会在App store上被编译
+和链接。bitcode允许苹果在后期重新优化我们程序的二进制文件，而不需要我们重新提交一个新的版本到App store上。
+对应iOS，bitcode是可选的；对于watchOS，bitcode是必须的；Mac OS不支持bitcode。
+Enable Index-While-Building Functionality : 控制编译器在编译时是否应该发出索引数据。
+Enable Testability : 是否支持测试。Debug默认Yes，Release默认No。
+Generate Profiling Code : 是否生成配置代码。默认选择NO。
+
+	
 
 </code></pre></div></div>
 
