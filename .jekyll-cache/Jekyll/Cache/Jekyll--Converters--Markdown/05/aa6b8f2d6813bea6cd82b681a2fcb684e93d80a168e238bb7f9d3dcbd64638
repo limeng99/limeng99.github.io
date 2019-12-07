@@ -1,0 +1,17 @@
+I"\<p>开发之余，对于Xcode工程配置中Build Settings了解不够清晰准确，通过查阅资料，希望能够通过这篇文章加深Build Setting的理解，并记录分享。</p>
+
+<h3 id="1-architectures">1. Architectures</h3>
+
+<p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-architectures.png" alt="xcode-architectures" /></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Additional SDKs : 在编译时要附加的SDK
+Architectures : 支持的处理器架构。支持的指令集越多，就会编译出包含多个指令集代码的数据包，对应生成二进制包就
+会越大，最终目标文件也会变大。
+Base SDK : 当前编译用的SDK版本
+Build Active Architecture Only : 如果此项为Yes，则Xcode会根据当前所连接的设备版本只将相应的Architecture编
+译入App。否则会同时编译'Valid Architectures'中的指令集。建议在Debug模式下设置为Yes，Release模式下设置为No，
+加快编译速度。
+Supported Platform : 
+</code></pre></div></div>
+
+:ET
