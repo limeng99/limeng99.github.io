@@ -45,5 +45,35 @@ armv7：iPhone4｜iPhone4S｜iPad｜iPad2｜iPad3(The New iPad)｜iPad mini｜iP
 真机32位处理器需要armv7,或者armv7s架构，真机64位处理器需要arm64架构。
 ```
 
+### 2. Assets
 
+![xcode-assets](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-assets.png)
+
+```
+Asset Pack Manifest URL Prefix : 资源包清单的下载路径URL前缀
+Embed Asset Packs In Product Bundle : 是否将资源包嵌入产品的bundle中
+Enable On Demand Resources : 是否开启按需获取资源功能
+On Demand Resources Initial Install Tags : 按需加载资源时的初始安装资源文件标签
+On Demand Resources Prefetch Order : 按需加载资源时预加载的标签顺序
+```
+
+### 3. Build Locations
+
+![xcode-locations](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-locations.png)
+
+```
+Build Products Paths : 产品文件和编译中间文件的根目录。产品文件和编译时临时文件都将放在这个目录的子目录中。
+Intermediate Build Files Path : 编译时临时文件的存放位置。编译中间文件格式为product name+.build，
+如MyProduct.build。
+Per-configuration Build Products Path : 当前编译设置下的产品存放位置。
+```
+
+### 4. Build Options
+
+![xcode-options](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-options.png)
+
+```
+Always Embed Swift Standard Libraries : 始终嵌入swift标准库。对于未使用swift代码的情况可以设置为NO。
+
+```
 
