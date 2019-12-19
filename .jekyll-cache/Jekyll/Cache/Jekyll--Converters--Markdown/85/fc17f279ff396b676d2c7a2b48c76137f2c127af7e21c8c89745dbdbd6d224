@@ -1,8 +1,11 @@
-I"î
+I"‰
 <ul>
   <li><a href="#1-architectures">1. Architectures</a></li>
   <li><a href="#2-assets">2. Assets</a></li>
   <li><a href="#3-build-locations">3. Build Locations</a></li>
   <li><a href="#4-build-options">4. Build Options</a></li>
+  <li><a href="#5-search-paths">5. Search Paths</a></li>
+  <li><a href="#6-packaging">6. Packaging</a></li>
+  <li><a href="#7-signing">7. Signing</a></li>
 </ul>
 :EF

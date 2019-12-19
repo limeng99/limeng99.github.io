@@ -119,3 +119,38 @@ Scan All Source Files for Includes : 扫描include文件所包含的所有源文
 Validate Built Product : 这个选项决定了是否在编译的时候进行验证。验证的内容和app store的审查内容一致。默认选项是debug时不验证，release时验证。
 ```
 
+### 5. Search Paths
+
+![xcode-searchpaths](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-searchpaths.png)
+
+```
+Always Search User Paths : 是否搜索用户指定的路径，默认No。
+Framework Search Paths : 工程引用的framework搜索路径。
+Header Search Paths : 工程中引用的头文件搜索路径。
+Library Search Paths : library搜索路径，比如静态.a库。
+Sub-Directories to Exclude in Recursive Searches : 指定哪些类型的子目录在递归查找时忽略。
+Sub-Directories to include in Recursive Searches : 指定哪些类型的子目录在递归查找时包含。
+User Header Search Paths : 设置头文件搜索路径，这个只有当Always Search User Path开启后才有效。
+```
+
+### 6. Packaging
+![xcode-packasing](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-signing.png)
+
+```
+
+```
+
+
+### 7. Signing
+
+![xcode-signing](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-signing.png)
+
+```
+Code Signing Entitlements : 授权机制。在Xcode的capabilities选项卡下选择一些选项后，Xcode就会生成这样一段XML，Xcode会自动生成一个entitlements文件，然后再需要的时候往里面添加条目。当构建整个应用时，这个文件也会提及给codesign作为应用所需要拥有哪些授权的参考。这些授权信息必须都在开发者中心的AppID中启用，并且包含在配置文件中。
+
+Code Signing Identity : 配置证书。
+Code Signing Style : Automatic自动配置, Manual手动配置。
+Development Team : 开发者所在的群组。
+Provisioning Profile : 配置描述文件。
+```
+
