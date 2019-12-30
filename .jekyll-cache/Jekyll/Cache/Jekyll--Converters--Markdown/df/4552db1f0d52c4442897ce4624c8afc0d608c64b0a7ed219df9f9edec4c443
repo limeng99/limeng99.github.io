@@ -1,0 +1,26 @@
+I".
+<ul>
+  <li><a href="#一-事件传递响应流程">一. 事件传递&amp;响应流程</a></li>
+  <li><a href="#二-事件传递">二. 事件传递</a>
+    <ul>
+      <li><a href="#21-hittestwithevent和pointinsidewithevent">2.1 hitTest:withEvent:和pointInside:withEvent:</a></li>
+      <li><a href="#22-hittestwithevent内部实现代码还原">2.2 hitTest:withEvent:内部实现代码还原</a></li>
+      <li><a href="#23-hittestwithevent应用实例">2.3 hitTest:withEvent:应用实例</a></li>
+    </ul>
+  </li>
+  <li><a href="#三-事件响应">三. 事件响应</a>
+    <ul>
+      <li><a href="#31-响应链的组成">3.1 响应链的组成</a></li>
+      <li><a href="#32-uicontrol与uiscrollview阻断响应链">3.2 UIControl与UIScrollView阻断响应链</a></li>
+    </ul>
+  </li>
+  <li><a href="#四-手势gesture">四. 手势Gesture</a>
+    <ul>
+      <li><a href="#41-手势gesture与touch事件的关系">4.1 手势Gesture与Touch事件的关系</a></li>
+      <li><a href="#42-手势gesture和uicontrol的关系">4.2 手势Gesture和UIControl的关系</a></li>
+      <li><a href="#43-手势gesture和uiscrollview的关系">4.3 手势Gesture和UIScrollview的关系</a></li>
+      <li><a href="#44-uiscrollview点击穿透解决方案">4.4 UIScrollView点击穿透解决方案</a></li>
+    </ul>
+  </li>
+</ul>
+:ET
