@@ -1,0 +1,152 @@
+I"�.<p>Runtime的特性主要是消息(<code class="highlighter-rouge">方法</code>)传递，如果消息(<code class="highlighter-rouge">方法</code>)在对象中找不到，就进行转发，具体怎么实现的呢。我们从下面几个方面探寻Runtime的实现机制。</p>
+
+<h3 id="runtime介绍">Runtime介绍</h3>
+
+<blockquote>
+  <p>Objective-C 扩展了 C 语言，并加入了面向对象特性和 Smalltalk 式的消息传递机制。而这个扩展的核心是一个用 C 和 编译语言 写的 Runtime 库。它是 Objective-C 面向对象和动态机制的基石。</p>
+</blockquote>
+
+<blockquote>
+  <p>Objective-C 是一个动态语言，这意味着它不仅需要一个编译器，也需要一个运行时系统来动态得创建类和对象、进行消息传递和转发。理解 Objective-C 的 Runtime 机制可以帮我们更好的了解这个语言，适当的时候还能对语言进行扩展，从系统层面解决项目中的一些设计或技术问题。了解 Runtime ，要先了解它的核心 - 消息传递 （Messaging）。</p>
+</blockquote>
+
+<p><code class="highlighter-rouge">Runtime</code> 基本是用 <code class="highlighter-rouge">C</code> 和<code class="highlighter-rouge">汇编</code>写的，可见苹果为了动态系统的高效而作出的努力。你可以在<a href="http://www.opensource.apple.com/source/objc4/">这里</a>下到苹果维护的开源代码。苹果和GNU各自维护一个开源的 <a href="https://github.com/RetVal/objc-runtime">runtime</a> 版本，这两个版本之间都在努力的保持一致。</p>
+
+<p>平时的业务中主要是使用<a href="https://developer.apple.com/reference/objectivec/objective_c_runtime#//apple_ref/doc/uid/TP40001418-CH1g-126286">官方Api</a>，解决我们框架性的需求。</p>
+
+<p>高级编程语言想要成为可执行文件需要先编译为汇编语言再汇编为机器语言，机器语言也是计算机能够识别的唯一语言，但是<code class="highlighter-rouge">OC</code>并不能直接编译为汇编语言，而是要先转写为纯<code class="highlighter-rouge">C</code>语言再进行编译和汇编的操作，从<code class="highlighter-rouge">OC</code>到<code class="highlighter-rouge">C</code>语言的过渡就是由runtime来实现的。然而我们使用<code class="highlighter-rouge">OC</code>进行面向对象开发，而<code class="highlighter-rouge">C</code>语言更多的是面向过程开发，这就需要将面向对象的类转变为面向过程的结构体。</p>
+
+<h3 id="runtime消息传递">Runtime消息传递</h3>
+
+<p>一个对象的方法像这样<code class="highlighter-rouge">[obj message]</code>，编译器转成消息发送<code class="highlighter-rouge">objc_msgSend(obj, message)</code>，<code class="highlighter-rouge">Runtime</code>时执行流程是这样的：</p>
+
+<ul>
+  <li>首先，通过<code class="highlighter-rouge">obj</code>的<code class="highlighter-rouge">isa</code>指针找到它的<code class="highlighter-rouge">classs</code>；</li>
+  <li>在<code class="highlighter-rouge">class</code>的<code class="highlighter-rouge">method list</code>找<code class="highlighter-rouge">messge</code>；</li>
+  <li>如果<code class="highlighter-rouge">class</code>中没有找到<code class="highlighter-rouge">messge</code>，继续往它的<code class="highlighter-rouge">superclass</code>中找；</li>
+  <li>一旦找到<code class="highlighter-rouge">message</code>这个函数，就去执行它的实现<code class="highlighter-rouge">IMP</code>。</li>
+</ul>
+
+<p>但这种实现存在问题，效率低。因为一个<code class="highlighter-rouge">class</code>通常只有<code class="highlighter-rouge">20%</code>的函数会经常被调用，可能占总调用次数的<code class="highlighter-rouge">80%</code>。每个消息都需要遍历一次<code class="highlighter-rouge">objc_method_list</code>并不合理。而<code class="highlighter-rouge">objc_class</code>中另外一个重要成员<code class="highlighter-rouge">objc_cache</code>就会消除上述问题，在找到<code class="highlighter-rouge">message</code>之后，会把<code class="highlighter-rouge">message</code>的<code class="highlighter-rouge">method_name</code>作为<code class="highlighter-rouge">key</code>，<code class="highlighter-rouge">method_imp</code>作为<code class="highlighter-rouge">value</code>存储起来。当再次受到<code class="highlighter-rouge">message</code>消息的时候，就可以直接在<code class="highlighter-rouge">objc_cache</code>里找到，避免去遍历<code class="highlighter-rouge">objc_method_list</code>。</p>
+
+<p><code class="highlighter-rouge">objc_msgSend</code>的方法定义如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>OBJC_EXPORT void objc_msgSend(void /* id self, SEL op, ... */ )
+</code></pre></div></div>
+
+<p>那么消息传递是怎么实现的呢？我们看看对象(<code class="highlighter-rouge">object</code>)，类(<code class="highlighter-rouge">class</code>)，方法(<code class="highlighter-rouge">method</code>)这几个结构体：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 对象
+struct objc_object {
+    Class _Nonnull isa  OBJC_ISA_AVAILABILITY;
+};
+
+// 类
+struct objc_class {
+    Class _Nonnull isa  OBJC_ISA_AVAILABILITY;
+#if !__OBJC2__
+    Class _Nullable super_class                              OBJC2_UNAVAILABLE;
+    const char * _Nonnull name                               OBJC2_UNAVAILABLE;
+    long version                                             OBJC2_UNAVAILABLE;
+    long info                                                OBJC2_UNAVAILABLE;
+    long instance_size                                       OBJC2_UNAVAILABLE;
+    struct objc_ivar_list * _Nullable ivars                  OBJC2_UNAVAILABLE;
+    struct objc_method_list * _Nullable * _Nullable methodLists                    OBJC2_UNAVAILABLE;
+    struct objc_cache * _Nonnull cache                       OBJC2_UNAVAILABLE;
+    struct objc_protocol_list * _Nullable protocols          OBJC2_UNAVAILABLE;
+#endif
+} OBJC2_UNAVAILABLE;
+
+// 方法列表
+struct objc_method_list {
+    struct objc_method_list * _Nullable obsolete             OBJC2_UNAVAILABLE;
+    int method_count                                         OBJC2_UNAVAILABLE;
+#ifdef __LP64__
+    int space                                                OBJC2_UNAVAILABLE;
+#endif
+    /* variable length structure */
+    struct objc_method method_list[1]                        OBJC2_UNAVAILABLE;
+}                                                            OBJC2_UNAVAILABLE
+
+// 方法
+struct objc_method {
+    SEL _Nonnull method_name                                 OBJC2_UNAVAILABLE;
+    char * _Nullable method_types                            OBJC2_UNAVAILABLE;
+    IMP _Nonnull method_imp                                  OBJC2_UNAVAILABLE;
+}                                                            OBJC2_UNAVAILABLE;
+</code></pre></div></div>
+
+<ol>
+  <li>
+    <p>系统首先找到消息的接收对象，然后通过对象<code class="highlighter-rouge">isa</code>指针找到它的类<code class="highlighter-rouge">class</code>。</p>
+  </li>
+  <li>
+    <p>在它的类中查找<code class="highlighter-rouge">method_list</code>，是否有<code class="highlighter-rouge">selector</code>方法。</p>
+  </li>
+  <li>
+    <p>没有则查找父类的<code class="highlighter-rouge">method_list</code>。</p>
+  </li>
+  <li>
+    <p>找到对应的<code class="highlighter-rouge">method</code>，执行它的<code class="highlighter-rouge">IMP</code>。</p>
+  </li>
+  <li>
+    <p>转发<code class="highlighter-rouge">IMP</code>的<code class="highlighter-rouge">return</code>值。</p>
+  </li>
+</ol>
+
+<h4 id="类对象objc_class">类对象(objc_class)</h4>
+
+<p><code class="highlighter-rouge">Objective-C</code>类是由<code class="highlighter-rouge">Class</code>类型来表示的，它实际上是一个指向<code class="highlighter-rouge">objc_class</code>结构体的指针。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>typedef struct objc_class *Class;
+</code></pre></div></div>
+
+<p>查看<code class="highlighter-rouge">objc/runtime.h</code>中<code class="highlighter-rouge">objc_class</code>结构体定义如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>struct objc_class {
+    Class _Nonnull isa  OBJC_ISA_AVAILABILITY;
+    
+#if !__OBJC2__
+    Class _Nullable super_class                              OBJC2_UNAVAILABLE;
+    const char * _Nonnull name                               OBJC2_UNAVAILABLE;
+    long version                                             OBJC2_UNAVAILABLE;
+    long info                                                OBJC2_UNAVAILABLE;
+    long instance_size                                       OBJC2_UNAVAILABLE;
+    struct objc_ivar_list * _Nullable ivars                  OBJC2_UNAVAILABLE;
+    struct objc_method_list * _Nullable * _Nullable methodLists                    OBJC2_UNAVAILABLE;
+    struct objc_cache * _Nonnull cache                       OBJC2_UNAVAILABLE;
+    struct objc_protocol_list * _Nullable protocols          OBJC2_UNAVAILABLE;
+#endif
+
+} OBJC2_UNAVAILABLE;
+</code></pre></div></div>
+
+<p><code class="highlighter-rouge">struct objc_class</code>结构体里保存了指向父类的指针、类的名称、版本、实例大小、实例变量列表，方法列表、缓存、遵循协议列表等。
+类对象就是一个结构体<code class="highlighter-rouge">struct objc_class</code>，这个结构体存放的数据成为元数据(<code class="highlighter-rouge">metadata</code>)。
+该结构体的第一个成员变量<code class="highlighter-rouge">isa</code>指针，这就说明类本身其实也是一个对象，因此我们称<code class="highlighter-rouge">objc_class</code>其为类对象，类对象在编译期产生用于创建实例对象，类对象是单例。</p>
+
+<h4 id="实例对象objc_object">实例对象(objc_object)</h4>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>struct objc_object {
+    Class _Nonnull isa  OBJC_ISA_AVAILABILITY;
+};
+
+typedef struct objc_object *id;
+</code></pre></div></div>
+
+<p>实例对象中<code class="highlighter-rouge">isa</code>指针指向类对象<code class="highlighter-rouge">objc_class</code>。
+类对象中的元数据存储的都是如何创建一个实例的相关信息，那么类对象和类方法应该从哪里创建呢？
+就是从<code class="highlighter-rouge">isa</code>指针指向的结构体创建，类对象的<code class="highlighter-rouge">isa</code>指针</p>
+
+<h4 id="元类meta-class">元类(Meta Class)</h4>
+
+<p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/runtime-meta.png" alt="runtime-meta" /></p>
+
+<p>通过上图我们可以看出整个体系构成了一个自闭环，<code class="highlighter-rouge">struct objc_object</code>结构体<code class="highlighter-rouge">实例</code>它的<code class="highlighter-rouge">isa</code>指针指向类对象；
+类对象的<code class="highlighter-rouge">isa</code>指针指向了元类，<code class="highlighter-rouge">super_class</code>指针指向父类的类对象；
+而元类的<code class="highlighter-rouge">super_class</code>指针指向了父类的元类，那元类的<code class="highlighter-rouge">isa</code>指针又指向了<code class="highlighter-rouge">NSObject元类</code>；
+<code class="highlighter-rouge">NSObject元类</code>的<code class="highlighter-rouge">super_class</code>指针指向了<code class="highlighter-rouge">NSObject类对象</code>，<code class="highlighter-rouge">isa</code>指针指向了自己。</p>
+
+<p>元类(Meta Class)是一个类对象的类。
+所有的类自身也是一个对象，</p>
+:ET

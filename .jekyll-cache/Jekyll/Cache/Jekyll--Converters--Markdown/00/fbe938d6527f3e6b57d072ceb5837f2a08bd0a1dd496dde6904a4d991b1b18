@@ -1,0 +1,2 @@
+I"<p>Runtime的特性主要是消息(<code class="highlighter-rouge">方法</code>)传递，如果消息(<code class="highlighter-rouge">方法</code>)在对象中找不到，就进行转发，具体怎么实现的呢。我们从下面几个方面探寻Runtime的实现机制。</p>
+:ET
