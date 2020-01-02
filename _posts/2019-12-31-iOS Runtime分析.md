@@ -669,7 +669,7 @@ NSKVONotifying_A中`setter`方法剖析
 ```
 - (instancetype)initWithDict:(NSDictionary *)dict {
 
-    if (self = [self init]) {
+    if (self = [super init]) {
         //(1)获取类的属性及属性对应的类型
         NSMutableArray * keys = [NSMutableArray array];
         NSMutableArray * attributes = [NSMutableArray array];
