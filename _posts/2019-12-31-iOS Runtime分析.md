@@ -154,3 +154,110 @@ typedef struct objc_object *id;
 为了调用类方法，这个类的`isa`指针必须指向一个包含这些类方法的一个`objc_class`结构体。这就引出了`meta-class`的概念，元类中保存了创建类对象及类方法所需的所有信息。
 任何`NSObject`继承体系下的`meta-class`都使用`NSObject`的`meta-class`作为自己的所属类，而基类的`meta-class`的`isa`指针指向它自己。
 
+#### Method(Objc_method)
+
+```
+typedef struct objc_method *Method;
+
+struct objc_method {
+    SEL _Nonnull method_name                                 OBJC2_UNAVAILABLE;
+    char * _Nullable method_types                            OBJC2_UNAVAILABLE;
+    IMP _Nonnull method_imp                                  OBJC2_UNAVAILABLE;
+}                                                            
+```
+
+`Method`和平时理解的函数是一致的，就是表示能够独立完成一个功能的一段代码。
+`objc_method`结构体内容：
+- `SEL _Nonnull method_name` 方法名
+- `char * _Nullable method_types` 方法类型
+- `IMP _Nonnull method_imp` 方法实现
+
+从此看出，`SEL`和`IMP`均是`Method`的属性。
+
+#### SEL(objc_selector)
+
+```
+typedef struct objc_selector *SEL;
+```
+
+`objc_msgSend`函数第二个参数类型是`SEL`，它是`selector`在`Objective-C`中的表示类型（`Swift`中是`Selector`类）。`selector`是方法选择器，可以理解区分方法的`ID`，而这个`ID`的数据结构是`SEL`。
+
+```
+@property SEL selector;
+```
+
+可以看出来`selector`是`SEL`的一个实例。
+其实`selector`就是个映射到方法的`C`字符串，你可以用`Objective-C`编译器命令`@selector()`或者`Runtime`系统的`sel_registerName`函数来获取一个`SEL`类型的方法选择器。
+
+`selector`既然是一个`string`，应该是类似`className+method`的组合，命名规则有两条：
+
+- 同一个类，`selector`不能重复
+- 不同的类，`selector`可以重复
+
+这样会有一个弊端，我们在写`C`代码的时候，经常会用到函数重载，就是函数名相同，参数不同，但是这在`Objective-C`中是行不通的，因为`selector`只记了`className+method`，没有参数，所以没法取费不同的`method`。
+
+比如：
+
+```
+- (void)caculate(NSInteger)num;
+- (void)caculate(CGFloat)num;
+```
+
+这样是会报错的。
+
+我们只能通过命名来区分：
+
+```
+- (void)caculateWithInt(NSInteger)num;
+- (void)caculateWithFloat(CGFloat)num;
+```
+
+在不同类中相同名字的方法所对应的选择器是相同的，即使方法名字相同而变量类型不同也会导致他们具有相同的方法选择器。
+
+#### IMP
+
+```
+typedef id _Nullable (*IMP)(id _Nonnull, SEL _Nonnull, ...); 
+```
+
+就是指向最终实现程序的内存地址的指针。
+
+在`iOS`的`Runtime`中，`Method`通过`selector`和`IMP`两个属性，实现了快速查询方法及实现，相对提高了性能，又保持了灵活性。
+
+#### 类缓存(objc_cache)
+
+当`Objective-C`运行时通过跟踪它的`isa`指针检查对象时，它可以找到一个实现许多方法的对象。然而，你可能只调用它们的一小部分，并且每次查找时，搜索所有选择器的类分派表没有意义。所以类实现一个缓存，每当你搜索一个类分派表，并找到相应的选择器，它把它放入它的缓存。所以当`objc_msgSend`查找一个类的选择器，它首先搜索类缓存。这是基于这样的理论：如果你在类上调用一个消息，你可能以后再次调用该消息。
+
+为了加速消息分发， 系统会对方法和对应的地址进行缓存，就放在上述的`objc_cache`，所以在实际运行中，大部分常用的方法都是会被缓存起来的，`Runtime`系统实际上非常快，接近直接执行内存地址的程序速度。
+
+#### Category(objc_category)
+
+`Category`是表示一个指向分类的结构体的指针，其定义如下：
+
+```
+struct category_t { 
+    const char *name; 
+    classref_t cls; 
+    struct method_list_t *instanceMethods; 
+    struct method_list_t *classMethods;
+    struct protocol_list_t *protocols;
+    struct property_list_t *instanceProperties;
+};
+
+name：是指 class_name 而不是 category_name。
+cls：要扩展的类对象，编译期间是不会定义的，而是在Runtime阶段通过name对 应到对应的类对象。
+instanceMethods：category中所有给类添加的实例方法的列表。
+classMethods：category中所有添加的类方法的列表。
+protocols：category实现的所有协议的列表。
+instanceProperties：表示Category里所有的properties，这就是我们可以通过objc_setAssociatedObject和objc_getAssociatedObject增加实例变量的原因，不过这个和一般的实例变量是不一样的。
+```
+
+从上面的`objc_category`的结构体中可以看出，分类中可以添加实例方法，类方法，甚至可以实现协议，添加属性，不可以添加成员变量。
+
+### Runtime消息转发
+
+上文中介绍了进行一次消息发送会在相关类对象中搜索方法列表，如果找不到则会沿着继承树向上一直搜索直到继承树的根部(通常为`NSObject`)，如果还是找不到会怎么样呢？接下来会逐一介绍消息转发的流程，先看下图：
+
+![runtime-forward](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/runtime-forward.png)
+
+
