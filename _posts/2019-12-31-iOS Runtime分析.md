@@ -1,3 +1,4 @@
+---
 layout: post
 title: "iOS Runtime分析"
 author: "李萌"
@@ -6,6 +7,7 @@ tags: [learning]
 feature-img: "assets/img/article/runtime.jpg"
 thumbnail: "assets/img/article/runtime.jpg"
 typora-root-url: ../assets
+---
 
 Runtime的特性主要是消息(`方法`)传递，如果消息(`方法`)在对象中找不到，就进行转发，具体怎么实现的呢。我们从下面几个方面探寻Runtime的实现机制。
 
