@@ -1,4 +1,3 @@
----
 layout: post
 title: "iOS Runtime分析"
 author: "李萌"
@@ -7,7 +6,6 @@ tags: [learning]
 feature-img: "assets/img/article/runtime.jpg"
 thumbnail: "assets/img/article/runtime.jpg"
 typora-root-url: ../assets
----
 
 Runtime的特性主要是消息(`方法`)传递，如果消息(`方法`)在对象中找不到，就进行转发，具体怎么实现的呢。我们从下面几个方面探寻Runtime的实现机制。
 
@@ -260,4 +258,445 @@ instanceProperties：表示Category里所有的properties，这就是我们可�
 
 ![runtime-forward](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/runtime-forward.png)
 
+消息转发三个步骤：动态方法解析；备用接收者；完整消息转发。
 
+#### 动态方法解析
+
+首先，`Objective-C`运行时会调用`+resolveInstanceMethod:`或者`+resolveClassMethod:`，让你有机会提供一个函数实现。如果你添加了函数并返回`Yes`，那运行时系统就会重新启动一次消息发送的过程。
+
+```
+- (void)viewDidLoad {
+    [super viewDidLoad];
+
+    // 执行msg函数
+    [self performSelector:@selector(msg:)];
+}
+
++ (BOOL)resolveInstanceMethod:(SEL)sel {
+    // 检测到如果是执行msg函数，就动态解析，指定新的IMP
+    if (sel == @selector(msg:)) {
+        class_addMethod([self class], sel, (IMP)msgMethod, "v@:");
+        return YES;
+    }
+    return [super resolveInstanceMethod:sel];
+}
+
+// 新的msg函数
+void msgMethod(id obj, SEL _cmd) {
+    NSLog(@"Receive message");
+}
+```
+
+打印日志：
+
+```
+2020-01-02 10:01:00.294697+0800 Runtime-Demo[44489:1441571] Receive message
+```
+
+可以看到虽然没有实现`msg:`函数，但是我们通过`class_addMethod`动态添加`msgMethod`函数，并执行`msgMethod`这个函数的`IMP`。从打印日志看，成功实现了消息转发。
+
+如果`+resolveInstanceMethod:`方法`NO`，运行时就会移到下一步`-forwardingTargetForSelector:`。
+
+#### 备用接收者
+
+如果目标对象实现了`-forwardingTargetForSelector:`，`Runtime`这时就会调用这个方法，给你把这个消息转发给其他对象的机会。
+
+```
+#import "ViewController.h"
+#import <objc/runtime.h>
+
+@interface Receiver: NSObject
+
+@end
+
+@implementation Receiver
+
+// Receiver的msg函数
+- (void)msg {
+    NSLog(@"Receive message");
+}
+
+@end
+
+@interface ViewController ()
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+
+    // 执行msg函数
+    [self performSelector:@selector(msg)];
+}
+
++ (BOOL)resolveInstanceMethod:(SEL)sel {
+    return NO; //返回NO，进入下一步转发
+}
+
+- (id)forwardingTargetForSelector:(SEL)aSelector {
+    if (aSelector == @selector(msg)) {
+        return [Receiver new]; //返回Receiver对象，让Receiver对象接收这个消息
+    }
+    return [super forwardingTargetForSelector:aSelector];
+}
+
+@end
+```
+
+打印日志：
+
+```
+2020-01-02 10:16:20.360133+0800 Runtime-Demo[44635:1453911] Receive message
+```
+
+可以看到我们通过`-forwardingTargetForSelector:`把当前`ViewController`的方法转发给了`Receiver`去执行了。打印结果也证明我们成功实现了转发。
+
+#### 完整消息转发
+
+如果以上两步还不能处理未知消息，则唯一能做的就是启动完整的消息转发机制了。首先它会发送`methodSignatureForSelector:`消息获得函数的参数和返回值类型。如果`methodSignatureForSelector:`返回`nil`，运行时系统则会发出`doesNotRecognizeSelector:`消息，程序也就挂掉了。如果返回了一个函数签名，运行时就会创建一个`NSInvocation`对象并发送`-forwardInvocation:`消息给目标对象。
+
+```
+#import "ViewController.h"
+#import <objc/runtime.h>
+
+@interface Receiver: NSObject
+
+@end
+
+@implementation Receiver
+
+// Receiver的msg函数
+- (void)msg {
+    NSLog(@"Receive message");
+}
+
+@end
+
+@interface ViewController ()
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+
+    // 执行msg函数
+    [self performSelector:@selector(msg)];
+}
+
++ (BOOL)resolveInstanceMethod:(SEL)sel {
+    return NO; //返回NO，进入下一步转发
+}
+
+- (id)forwardingTargetForSelector:(SEL)aSelector {
+    return nil;//返回nil，进入下一步转发
+}
+
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector {
+    if ([NSStringFromSelector(aSelector) isEqualToString:@"msg"]) {
+    		//签名，进入forwardInvocation
+        return [NSMethodSignature signatureWithObjCTypes:"v@:"];
+    }
+    
+    return [super methodSignatureForSelector:aSelector];
+}
+
+- (void)forwardInvocation:(NSInvocation *)anInvocation {
+    SEL sel = anInvocation.selector;
+    
+    Receiver *receiver = [Receiver new];
+    if([receiver respondsToSelector:sel]) {
+        [anInvocation invokeWithTarget:receiver];
+    }
+    else {
+        [self doesNotRecognizeSelector:sel];
+    }
+}
+
+@end
+```
+
+打印日志：
+
+```
+2020-01-02 11:06:11.223700+0800 Runtime-Demo[46932:1491762] Receive message
+```
+
+从打印日志看，我们实现了完整的消息转发。通过签名，`Runtime`生成了一个对象`anInvocation`，发送给了`forwardInvocation`，我们在`forwardInvocation`方法里面让`Receiver`对象去执行了`msg`函数。签名参数`v@:`怎么解释呢，这里苹果文档[Type Encodings](https://developer.apple.com/library/content/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtTypeEncodings.html#//apple_ref/doc/uid/TP40008048-CH100-SW1)有详细的解释。
+
+### Runtime应用
+
+`Runtime`简直就是做大型框架的利器。它的应用场景非常多。
+
+#### 关联对象(Objective-C Associated Objects)给分类增加属性
+
+分类是不能定义属性和变量的，下面通过关联对象实现给分类添加属性。
+
+```
+//关联对象
+void objc_setAssociatedObject(id object, const void *key, id value, objc_AssociationPolicy policy)
+//获取关联的对象
+id objc_getAssociatedObject(id object, const void *key)
+//移除关联的对象
+void objc_removeAssociatedObjects(id object)
+
+id object：被关联的对象
+const void *key：关联的key，要求唯一
+id value：关联的对象
+objc_AssociationPolicy policy：内存管理的策略
+
+
+// 内存管理的策略
+typedef OBJC_ENUM(uintptr_t, objc_AssociationPolicy) {
+    OBJC_ASSOCIATION_ASSIGN = 0,           /**< Specifies a weak reference to the associated object. */
+    OBJC_ASSOCIATION_RETAIN_NONATOMIC = 1, /**< Specifies a strong reference to the associated object. 
+                                            *   The association is not made atomically. */
+    OBJC_ASSOCIATION_COPY_NONATOMIC = 3,   /**< Specifies that the associated object is copied. 
+                                            *   The association is not made atomically. */
+    OBJC_ASSOCIATION_RETAIN = 01401,       /**< Specifies a strong reference to the associated object.
+                                            *   The association is made atomically. */
+    OBJC_ASSOCIATION_COPY = 01403          /**< Specifies that the associated object is copied.
+                                            *   The association is made atomically. */
+};
+```
+
+内存策略的属性修饰
+
+| 内存策略                          | 属性修饰                                            | 描述                                                         |
+| --------------------------------- | --------------------------------------------------- | ------------------------------------------------------------ |
+| OBJC_ASSOCIATION_ASSIGN           | @property (assign) 或 @property (unsafe_unretained) | 指定一个关联对象的弱引用。                                   |
+| OBJC_ASSOCIATION_RETAIN_NONATOMIC | @property (nonatomic, strong)                       | @property (nonatomic, strong)   指定一个关联对象的强引用，不能被原子化使用。 |
+| OBJC_ASSOCIATION_COPY_NONATOMIC   | @property (nonatomic, copy)                         | 指定一个关联对象的copy引用，不能被原子化使用。               |
+| OBJC_ASSOCIATION_RETAIN           | @property (atomic, strong)                          | 指定一个关联对象的强引用，能被原子化使用。                   |
+| OBJC_ASSOCIATION_COPY             | @property (atomic, copy)                            | 指定一个关联对象的copy引用，能被原子化使用。                 |
+
+实现`UIImage`分类添加自定义属性`name`。
+
+```
+// UIImage+Runtime.h
+@interface UIImage (Runtime)
+
+@property (nonatomic, copy) NSString *name;
+
+@end
+
+// UIImage+Runtime.m
+#import "UIImage+Runtime.h"
+#import <objc/runtime.h>
+
+@implementation UIImage (Runtime)
+
+- (void)setName:(NSString *)name {
+    objc_setAssociatedObject(self, @selector(name), name, OBJC_ASSOCIATION_COPY_NONATOMIC);
+}
+
+- (NSString *)name {
+    return objc_getAssociatedObject(self, _cmd);
+}
+
+@end
+
+// ViewController.m
+- (void)viewDidLoad {
+    [super viewDidLoad];
+
+    UIImage *image = [UIImage new];
+    image.name = @"image_pic";
+    NSLog(@"name: %@", image.name);
+}
+```
+
+打印日志：
+
+```
+2020-01-02 11:27:39.232196+0800 Runtime-Demo[47163:1508917] name: image_pic
+```
+
+打印结果来看，我们成功在分类上添加了一个属性，实现了它的`setter`和`getter`方法。
+ 通过关联对象实现的属性的内存管理也是有`ARC`管理的，所以我们只需要给定适当的内存策略就行了，不需要操心对象的释放。
+
+#### 方法魔法(Method Swizzling)
+
+对上面的`UIImage`的分类进行进一步扩展：
+
+```
+// UIImage+Runtime.h
+@interface UIImage (Runtime)
+
+@property (nonatomic, copy) NSString *name;
+
+@end
+
+// UIImage+Runtime.m
+#import "UIImage+Runtime.h"
+#import <objc/runtime.h>
+
+@implementation UIImage (Runtime)
+
++ (void)load {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Class class = [self class];
+        
+        Method originalMethod = class_getClassMethod(class, @selector(imageNamed:));
+        Method swizzledMethod = class_getClassMethod(class, @selector(rep_imageNamed:));
+        
+        BOOL add = class_addMethod(class, @selector(imageNamed:), method_getImplementation(swizzledMethod), method_getTypeEncoding(swizzledMethod));
+        if (add) {
+            class_replaceMethod(class, @selector(rep_imageNamed:), method_getImplementation(originalMethod), method_getTypeEncoding(originalMethod));
+        } else {
+            method_exchangeImplementations(originalMethod, swizzledMethod);
+        }
+    });
+}
+
++ (UIImage *)rep_imageNamed:(NSString *)imageName {
+    UIImage *image = [self rep_imageNamed:imageName];
+    image.name = imageName;
+    return image;
+}
+
+- (void)setName:(NSString *)name {
+    objc_setAssociatedObject(self, @selector(name), name, OBJC_ASSOCIATION_COPY_NONATOMIC);
+}
+
+- (NSString *)name {
+    return objc_getAssociatedObject(self, _cmd);
+}
+
+@end
+
+// ViewController.m
+- (void)viewDidLoad {
+    [super viewDidLoad];
+
+    UIImage *image = [UIImage imageNamed:@"image_pic"];
+    NSLog(@"name: %@", image.name);
+}
+```
+
+打印日志：
+
+```
+2020-01-02 11:45:01.073499+0800 Runtime-Demo[47296:1522764] name: image_pic
+```
+
+`swizzling`应该只在`+load`中完成。 在 `Objective-C` 的运行时中，每个类有两个方法都会自动调用。`+load` 是在一个类被初始装载时调用，`+initialize` 是在应用第一次调用该类的类方法或实例方法前调用的。两个方法都是可选的，并且只有在方法被实现的情况下才会被调用。
+
+`swizzling`应该只在`dispatch_once` 中完成,由于`swizzling` 改变了全局的状态，所以我们需要确保每个预防措施在运行时都是可用的。原子操作就是这样一个用于确保代码只会被执行一次的预防措施，就算是在不同的线程中也能确保代码只执行一次。`Grand Central Dispatch 的 dispatch_once`满足了所需要的需求，并且应该被当做使用`swizzling` 的初始化单例方法的标准。
+
+#### KVO实现
+
+> 全称是Key-value observing，翻译成键值观察。提供了一种当其它对象属性被修改的时候能通知当前对象的机制。再MVC大行其道的Cocoa中，KVO机制很适合实现model和controller类之间的通讯。
+
+`KVO`的实现依赖于`Objective-C`强大的`Runtime`，当观察某对象`A`时，`KVO`机制动态创建一个对象`A`当前类的子类，并为这个新的子类重写了被观察属性`keyPath`的`setter`方法。`setter`方法随后负责通知观察对象属性的改变状况。
+
+`Apple`使用了`isa-swizzing`来实现`KVO`。当观察对象`A`时，`KVO`机制动态创建新的名为`NSKVONotifying_A`的新类，该类继承自对象A的本类，并且`KVO`为`NSKVONotofying_A`重写观察属性的`setter`方法，`setter`方法负责在调用元`setter`方法之前和之后，通知所有观察对象属性值的更改情况。
+
+NSKVONotifying_A 类剖析
+
+```
+NSLog(@"self->isa:%@",self->isa);  
+NSLog(@"self class:%@",[self class]);  
+
+打印结果：
+self->isa:A
+self class:A
+
+在建立KVO监听之后，打印结果为：
+self->isa:NSKVONotifying_A
+self class:A
+```
+
+在这个过程，被观察对象的 `isa` 指针从指向原来的 `A` 类，被`KVO` 机制修改为指向系统新创建的子类`NSKVONotifying_A` 类，来实现当前类属性值改变的监听；
+当我们从应用层面上看来，完全没有意识到有新的类出现，这是系统隐藏了对`KVO`的底层实现过程，让我们误以为还是原来的类。但是此时如果我们创建一个新的名为`NSKVONotifying_A`的类，就会发现系统运行到注册`KVO`的那段代码时程序就崩溃，因为系统在注册监听的时候动态创建了名为`NSKVONotifying_A`的中间类，并指向这个中间类。
+
+NSKVONotifying_A中`setter`方法剖析
+
+```
+// KVO为子类的观察者属性重写调用存取方法的工作原理在代码中相当于
+- (void)setName:(NSString *)newName { 
+      [self willChangeValueForKey:@"name"];    //KVO 在调用存取方法之前总调用 
+      [super setValue:newName forKey:@"name"]; //调用父类的存取方法 
+      [self didChangeValueForKey:@"name"];     //KVO 在调用存取方法之后总调用
+}
+```
+
+`KVO`的键值观察通知依赖于`NSObject`的方格方法:`willChangeValueForKey:`和`didChangeValueForKey:`，在存值的前后分别调用这2个方法；
+被观察属性发生改变之前，`willChangeValueForKey:`被调用，通知系统该`keyPath`的属性值即将变更；当改变发生后，`didChangeValueForKey:`被调用通知系统该`keyPath`的属性值已经变更；之后，`observeValueForKey:ofObject:change:context:`也会被调用。且重写观察属性的`setter`方法这种继承方式的注入在运行时而不是在编译时实现的。
+
+#### NSCoding的自动归档与解档
+
+原理描述：用`runtime`提供的函数遍历`Model`自身所有属性，并对属性进行`encode`和`decode`操作。
+核心方法：在`Model`的基类中重写方法：
+
+```
+- (id)initWithCoder:(NSCoder *)aDecoder {
+    if (self = [super init]) {
+        unsigned int outCount;
+        Ivar * ivars = class_copyIvarList([self class], &outCount);
+        for (int i = 0; i < outCount; i ++) {
+            Ivar ivar = ivars[i];
+            NSString * key = [NSString stringWithUTF8String:ivar_getName(ivar)];
+            [self setValue:[aDecoder decodeObjectForKey:key] forKey:key];
+        }
+    }
+    return self;
+}
+
+- (void)encodeWithCoder:(NSCoder *)aCoder {
+    unsigned int outCount;
+    Ivar * ivars = class_copyIvarList([self class], &outCount);
+    for (int i = 0; i < outCount; i ++) {
+        Ivar ivar = ivars[i];
+        NSString * key = [NSString stringWithUTF8String:ivar_getName(ivar)];
+        [aCoder encodeObject:[self valueForKey:key] forKey:key];
+    }
+}
+```
+
+#### 实现字典和模型的自动转换(MJExtension)
+
+原理描述：用`runtime`提供的函数遍历`Model`自身所有属性，如果属性在`json`中有对应的值，则将其赋值。
+
+核心方法：在`NSObject`的分类中添加方法
+
+```
+- (instancetype)initWithDict:(NSDictionary *)dict {
+
+    if (self = [self init]) {
+        //(1)获取类的属性及属性对应的类型
+        NSMutableArray * keys = [NSMutableArray array];
+        NSMutableArray * attributes = [NSMutableArray array];
+        /*
+         * 例子
+         * name = value3 attribute = T@"NSString",C,N,V_value3
+         * name = value4 attribute = T^i,N,V_value4
+         */
+        unsigned int outCount;
+        objc_property_t * properties = class_copyPropertyList([self class], &outCount);
+        for (int i = 0; i < outCount; i ++) {
+            objc_property_t property = properties[i];
+            //通过property_getName函数获得属性的名字
+            NSString * propertyName = [NSString stringWithCString:property_getName(property) encoding:NSUTF8StringEncoding];
+            [keys addObject:propertyName];
+            //通过property_getAttributes函数可以获得属性的名字和@encode编码
+            NSString * propertyAttribute = [NSString stringWithCString:property_getAttributes(property) encoding:NSUTF8StringEncoding];
+            [attributes addObject:propertyAttribute];
+        }
+        //立即释放properties指向的内存
+        free(properties);
+
+        //(2)根据类型给属性赋值
+        for (NSString * key in keys) {
+            if ([dict valueForKey:key] == nil) continue;
+            [self setValue:[dict valueForKey:key] forKey:key];
+        }
+    }
+    return self;
+
+}
+```
