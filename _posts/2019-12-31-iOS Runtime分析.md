@@ -465,7 +465,7 @@ typedef OBJC_ENUM(uintptr_t, objc_AssociationPolicy) {
 };
 ```
 
-内存策略的属性修饰
+
 | 内存策略                          | 属性修饰                                            | 描述                                                         |
 | --------------------------------- | --------------------------------------------------- | ------------------------------------------------------------ |
 | OBJC_ASSOCIATION_ASSIGN           | @property (assign) 或 @property (unsafe_unretained) | 指定一个关联对象的弱引用。                                   |
