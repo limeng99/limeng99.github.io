@@ -1,0 +1,40 @@
+I"Z<p>当用户点击了App图标，到能够看到App主界面内容为止，在这个过程中应用做了那些事情呢？这些事情是否可以优化从而提高启动速度呢？下面我们将会讨论以上问题。</p>
+
+<h3 id="main之前">main()之前</h3>
+
+<p>在调用<code class="highlighter-rouge">main()</code>函数之前，基本所有工作都是由操作系统完成的，开发者能够插手的地方不多，多以如果想要想要优化这段时间，就必须了解，操作系统在<code class="highlighter-rouge">main()</code>之前做了什么。</p>
+
+<p><code class="highlighter-rouge">main()</code>之前操作系统所做的工作是把可执行文件（Mach-O格式）加载到内存空间，然后动态链接库dyld，再执行一系列动态链接操作和初始化操作的过程（加载、绑定。及初始化）。</p>
+
+<h4 id="加载过程从exec到main">加载过程—从exec()到main()</h4>
+
+<p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/main-load.png" alt="main-load" /></p>
+
+<ul>
+  <li><code class="highlighter-rouge">exec()</code>是一个系统调用</li>
+  <li>App对应的可执行文件加载到内存</li>
+  <li>把<code class="highlighter-rouge">Dyld</code>加载到内存中</li>
+  <li><code class="highlighter-rouge">Dyld</code>从主执行文件的<code class="highlighter-rouge">header</code>获取到需要加载的所依赖动态库列表，然后它需要找到每个<code class="highlighter-rouge">dylib</code>，而用所依赖的<code class="highlighter-rouge">dylib</code>文件可能会再依赖其他<code class="highlighter-rouge">dylib</code>，所以所需要加载的是动态库列表的一个递归依赖集合</li>
+  <li><code class="highlighter-rouge">Rebase</code>和<code class="highlighter-rouge">Bind</code>
+    <ul>
+      <li><code class="highlighter-rouge">Rebase</code>在<code class="highlighter-rouge">Image</code>内部调整指针的指向。在过去会把动态库加载到指定地址，所有指针和数据对于代码都是对的，而现在地址空间布局是随机化，所以需要在原来的地址根据随机的偏移量做一下修正</li>
+      <li><code class="highlighter-rouge">Bind</code>是吧指针正确地指向<code class="highlighter-rouge">Image</code>外部的内容。这些指向外部的指针被符号(<code class="highlighter-rouge">symbol</code>)名称绑定，<code class="highlighter-rouge">Dyld</code>需要去符号表里查找，找到<code class="highlighter-rouge">symbol</code>对应的实现。</li>
+    </ul>
+  </li>
+  <li><code class="highlighter-rouge">Objc</code></li>
+  <li>
+    <p>注册<code class="highlighter-rouge">Objc</code>类（class registration）</p>
+  </li>
+  <li>
+    <p>把<code class="highlighter-rouge">category</code>的定义插入方法列表（category registration）</p>
+  </li>
+  <li>保证每一个<code class="highlighter-rouge">selector</code>唯一（selector uniquing）</li>
+  <li><code class="highlighter-rouge">initializers</code>
+    <ul>
+      <li><code class="highlighter-rouge">Objc</code>的<code class="highlighter-rouge">+load()</code>函数</li>
+      <li><code class="highlighter-rouge">C++</code>的构造函数属性函数</li>
+      <li>非基本类型的<code class="highlighter-rouge">C++</code>静态全局变量的创建(通常是类或者结构体)</li>
+    </ul>
+  </li>
+</ul>
+:ET

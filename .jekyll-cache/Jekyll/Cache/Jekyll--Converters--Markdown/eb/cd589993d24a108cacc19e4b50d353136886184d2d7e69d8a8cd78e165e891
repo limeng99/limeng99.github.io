@@ -1,0 +1,16 @@
+I"�
+<ul>
+  <li><a href="#main之前">main()之前</a>
+    <ul>
+      <li><a href="#加载过程从exec到main">加载过程—从exec()到main()</a></li>
+      <li><a href="#main之前启动优化">main()之前启动优化</a></li>
+    </ul>
+  </li>
+  <li><a href="#main函数之后">main()函数之后</a>
+    <ul>
+      <li><a href="#优化耗时操作">优化耗时操作</a></li>
+      <li><a href="#优化串行操作">优化串行操作</a></li>
+    </ul>
+  </li>
+</ul>
+:ET
