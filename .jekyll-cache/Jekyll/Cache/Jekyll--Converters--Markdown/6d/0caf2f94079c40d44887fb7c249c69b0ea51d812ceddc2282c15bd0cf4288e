@@ -1,0 +1,12 @@
+I"f
+<ul>
+  <li><a href="#ain之前">ain之前</a>
+    <ul>
+      <li><a href="#加载过程从exec到main">加载过程—从exec()到main()</a></li>
+      <li><a href="#main加载前启动优化">main()加载前启动优化：</a></li>
+    </ul>
+  </li>
+  <li><a href="#main之后">Main之后</a></li>
+  <li><a href="#参考链接">参考链接</a></li>
+</ul>
+:ET
