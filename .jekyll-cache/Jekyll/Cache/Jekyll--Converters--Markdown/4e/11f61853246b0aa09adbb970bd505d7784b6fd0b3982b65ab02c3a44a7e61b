@@ -16,7 +16,7 @@
 <p><em>注：安装jekyll会用到ruby，最好不要用系统自带的，使用系统提供的ruby会出现没有权限问题，建议使用rbenv新安装一个ruby使用。</em></p>
 
 <p>具体安装ruby可以参考：
-<a href="https://limeng99.club/learning/2019/11/21/Mac%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE.html">Mac环境配置</a></p>
+<a href="https://limeng99.club/learning/2019/11/20/Mac%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE.html">Mac环境配置</a></p>
 
 <ul>
   <li>设置全局ruby版本

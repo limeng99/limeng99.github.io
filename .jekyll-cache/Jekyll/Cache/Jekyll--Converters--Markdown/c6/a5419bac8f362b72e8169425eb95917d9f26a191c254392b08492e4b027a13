@@ -1,8 +1,0 @@
-I"W<p>当用户点击了App图标，到能够看到App主界面内容为止，在这个过程中应用做了那些事情呢？这些事情是否可以优化从而提高启动速度呢？下面我们将会讨论以上问题。</p>
-
-<h3 id="main之前">main()之前</h3>
-
-<p>在调用<code class="highlighter-rouge">main()</code>函数之前，基本所有工作都是由操作系统完成的，开发者能够插手的地方不多，多以如果想要想要优化这段时间，就必须了解，操作系统在<code class="highlighter-rouge">main()</code>之前做了什么。</p>
-
-<p><code class="highlighter-rouge">main()</code>之前操作系统所做的工作是把可执行文件（Mach-O格式）加载到内存空间，然后动态链接库dyld，再执行一系列动态链接操作和初始化操作的过程（加载、绑定。及初始化）</p>
-:ET
