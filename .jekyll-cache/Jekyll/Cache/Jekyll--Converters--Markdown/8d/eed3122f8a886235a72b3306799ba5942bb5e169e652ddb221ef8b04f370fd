@@ -1,4 +1,4 @@
-I"  <h3 id="一homebrew安装">一、Homebrew安装</h3>
+I"* <h3 id="一homebrew安装">一、Homebrew安装</h3>
 
 <p>Linux上的<code class="highlighter-rouge">yum</code>工具特别方便，Mac上也有一个类似的工具<code class="highlighter-rouge">Homebrew</code>。<code class="highlighter-rouge">Homebrew</code>是一个软件包管理器，官网地址<a href="https://brew.sh/index_zh-cn">https://brew.sh/index_zh-cn</a>。</p>
 
@@ -31,7 +31,7 @@ $ rvm list known
 $ rvm install 2.6.0
 
 5.切换到指定ruby版本
-$ rvm use 2.6.0
+$ rvm use 2.6.0 --default
 
 6.卸载移除指定ruby版本
 $ rvm remove 2.2.2  
