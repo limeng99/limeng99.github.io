@@ -1,0 +1,42 @@
+I"C
+<ul>
+  <li><a href="#1-遇到的问题">1. 遇到的问题</a>
+    <ul>
+      <li><a href="#11-解决方法">1.1 解决方法</a></li>
+    </ul>
+  </li>
+  <li><a href="#2gcd的api">2.GCD的API</a>
+    <ul>
+      <li><a href="#21-什么是dispatch-queue">2.1 什么是Dispatch Queue</a></li>
+      <li><a href="#22-如何得到一个dispatch-queue">2.2. 如何得到一个Dispatch Queue</a>
+        <ul>
+          <li><a href="#221-通过gcd的api生成">2.2.1 通过GCD的API生成</a></li>
+          <li><a href="#222-获取系统标准提供的dispatch-queue">2.2.2 获取系统标准提供的Dispatch Queue</a></li>
+          <li><a href="#223-gcd同步和异步方法">2.2.3 GCD同步和异步方法</a></li>
+          <li><a href="#224-串行并行队列和同步异步结合分析">2.2.4 串行、并行队列和同步、异步结合分析</a></li>
+        </ul>
+      </li>
+      <li><a href="#23-dispatch-group">2.3 Dispatch Group</a></li>
+      <li><a href="#24-dispatch-semaphore">2.4 Dispatch Semaphore</a>
+        <ul>
+          <li><a href="#241-dispatch_semaphore_t创建多线程网络同步请求">2.4.1 dispatch_semaphore_t创建多线程网络同步请求</a></li>
+          <li><a href="#242-dispatch_semaphore_t设置最大并发数">2.4.2 dispatch_semaphore_t设置最大并发数</a></li>
+        </ul>
+      </li>
+      <li><a href="#25-dispatch-barrier">2.5 Dispatch Barrier</a>
+        <ul>
+          <li><a href="#251-dispatch_barrier_sync">2.5.1 dispatch_barrier_sync</a></li>
+          <li><a href="#252-dispatch_barrier_async">2.5.2 dispatch_barrier_async</a></li>
+        </ul>
+      </li>
+      <li><a href="#26-dispatch-source">2.6 Dispatch Source</a>
+        <ul>
+          <li><a href="#261-创建一个dispatch-source">2.6.1 创建一个Dispatch Source</a></li>
+          <li><a href="#262-创建dispatch-source的事件处理方法">2.6.2 创建Dispatch Source的事件处理方法</a></li>
+          <li><a href="#263-处理dispatch-source的暂停与恢复操作">2.6.3 处理Dispatch Source的暂停与恢复操作</a></li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+</ul>
+:ET

@@ -1,4 +1,4 @@
-I"�Y<h2 id="1-遇到的问题">1. 遇到的问题</h2>
+I"�z<h2 id="1-遇到的问题">1. 遇到的问题</h2>
 <p>在项目中经常会遇到这样的问题，一个页面由于内容繁多，结构复杂，后台写了5个接口进行支持，这5个接口互相又没有什么影响，也没什么顺序，但是就是需要把这5个接口的数据全都拿到之后组合一下然后刷新页面。</p>
 
 <p>今天我们主要来谈一下怎么更好的用第的方法来实现上述需求，在iOS里面GCD技术正好可以解决这种问题，当然也有其他方式，只是GCD用起来代码更简洁，实现更优雅。</p>
@@ -430,5 +430,160 @@ NSLog(@"主线程任务2");
 </code></pre></div></div>
 
 <p>由此可见，<code class="highlighter-rouge">dispatch_barrier_async</code>不会拦截后续任务加载到队列，但后续任务必须等待<code class="highlighter-rouge">dispatch_barrier_async</code>任务执行结束，后续任务才可执行</p>
+
+<h3 id="26-dispatch-source">2.6 Dispatch Source</h3>
+
+<p>GCD中除了主要的 <code class="highlighter-rouge">Dispatch Queue</code> 外，还有不太引人注目的 <code class="highlighter-rouge">Dispatch Source</code> 。使用 <code class="highlighter-rouge">Dispatch Source</code>而不使用 <code class="highlighter-rouge">Dispatch Queue</code>唯一原因就是利用联结的优势。</p>
+
+<p>联结的大致流程：在任一线程上调用它的的一个函数 <code class="highlighter-rouge">dispatch_source_merge_data</code> 后，会执行 <code class="highlighter-rouge">Dispatch Source</code> 事先定义好的句柄（可以把句柄简单理解为一个 block ）。</p>
+
+<p>这个过程叫 <code class="highlighter-rouge">Custom event</code> ,用户事件。是 dispatch source 支持处理的一种事件。</p>
+
+<blockquote>
+  <p>简单地说，这种事件是由你调用 <code class="highlighter-rouge">dispatch_source_merge_data</code> 函数来向自己发出的信号。</p>
+</blockquote>
+
+<h4 id="261-创建一个dispatch-source">2.6.1 创建一个Dispatch Source</h4>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// API
+dispatch_source_t source = dispatch_source_create(dispatch_source_type_t type, uintptr_t handle, unsigned long mask, dispatch_queue_t queue)
+
+// 指定DISPATCH_SOURCE_TYPE_DATA_ADD，做成Dispatch Source(分派源)。设定Main Dispatch Queue 为追加处理的Dispatch Queue
+_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_ADD, 0, 0, dispatch_get_main_queue());
+</code></pre></div></div>
+
+<p><strong>参数：</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>参数</th>
+      <th>意义</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>type</td>
+      <td>dispatch源可处理的事件</td>
+    </tr>
+    <tr>
+      <td>handle</td>
+      <td>可以理解为句柄、索引或id，假如要监听进程，需要传入进程的ID</td>
+    </tr>
+    <tr>
+      <td>mask</td>
+      <td>可以理解为描述，提供更详细的描述，让它知道具体要监听什么</td>
+    </tr>
+    <tr>
+      <td>queue</td>
+      <td>自定义源需要的一个队列，用来处理所有的响应句柄（block）</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="highlighter-rouge">Dispatch Source</code> 可处理的所有事件。如下表所示：</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>名称</th>
+      <th>内容</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_DATA_ADD</code></td>
+      <td>变量增加</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_DATA_OR</code></td>
+      <td>变量OR</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_MACH_SEND</code></td>
+      <td>MACH端口发送</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_MACH_RECV</code></td>
+      <td>MACH端口接收</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_PROC</code></td>
+      <td>监测到与进程相关的事件</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_READ</code></td>
+      <td>可读取文件映像</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_SIGNAL</code></td>
+      <td>接收信号</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_TIMER</code></td>
+      <td>定时器</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_VNODE</code></td>
+      <td>文件系统有变更</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_WRITE</code></td>
+      <td>可写入文件映像</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>自定义源也需要一个队列，用来处理所有的响应句柄（block）。那么岂不是有两个队列了？没错，至于 <code class="highlighter-rouge">Dispatch Queue</code> 这个队列的线程执行与 <code class="highlighter-rouge">Dispatch Source</code>这个队列的线程执行的关系，下文会详细介绍。</p>
+
+<h4 id="262-创建dispatch-source的事件处理">2.6.2 创建Dispatch Source的事件处理</h4>
+
+<p>创建源后，需要提供相应的处理方法。当源生效时会分派注册处理方法;当事件发生时会分派事件处理方法;当源被取消时会分派取消处理方法。自定义源通常只需要一个事件处理方法，可以像这样创建:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 指定DISPATCH_SOURCE_TYPE_DATA_ADD，做成Dispatch Source(分派源)。设定Main Dispatch Queue 为追加处理的Dispatch Queue
+_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_ADD, 0, 0, dispatch_get_main_queue());
+
+__block NSUInteger totalComplete = 0;
+dispatch_source_set_event_handler(_source, ^{
+    //当处理事件被最终执行时，计算后的数据可以通过dispatch_source_get_data来获取。这个数据的值在每次响应事件执行后会被重置，所以totalComplete的值是最终累积的值。
+    NSUInteger value = dispatch_source_get_data(self-&gt;_source);
+    totalComplete += value;
+    NSLog(@"进度：%@", @((CGFloat)totalComplete/100));
+    NSLog(@"🔵线程号：%@", [NSThread currentThread]);
+});
+
+// 分派源创建时默认处于暂停状态，在分派源分派处理程序之前必须先恢复。
+dispatch_resume(_source);
+
+// 恢复源后，就可以通过dispatch_source_merge_data向Dispatch Source(分派源)发送事件:
+dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+dispatch_async(queue, ^{
+    for (NSUInteger index = 0; index &lt; 100; index++) {
+        dispatch_source_merge_data(self-&gt;_source, 1);
+        NSLog(@"♻️线程号：%@", [NSThread currentThread]);
+        usleep(20000);//0.02秒
+    }
+});
+</code></pre></div></div>
+
+<p>在同一时间，只有一个处理方法块的实例被分派。如果这个处理方法还没有执行完毕，另一个事件就发生了，事件会以指定方式(ADD或者OR)进行累积。通过合并事件的方式，系统即使在高负 载情况下也能正常工作。当处理事件件被最终执行时，计算后的数据可以通过 <code class="highlighter-rouge">dispatch_source_get_data</code> 来获取。这个数据的值在每次响应事件执行后会被重置，所以上面例子中 <code class="highlighter-rouge">totalComplete</code> 的值是最终累积的值。</p>
+
+<p>恢复源后，就可以像下面的代码片段这样，通过 <code class="highlighter-rouge">dispatch_source_merge_data</code> 向分派源发送事件。在每次循环中执行加1操作。也可以传递已处理记录的数目或已写入的字节数。在任何线程中都可以调用 <code class="highlighter-rouge">dispatch_source_merge_data</code> 。需要注意的是，不可以传递0值(事件不会被触发)，同样也不可以传递负数。</p>
+
+<h4 id="263-处理dispatch-source的暂停与恢复操作">2.6.3 处理Dispatch Source的暂停与恢复操作</h4>
+
+<p>当追加大量处理到<code class="highlighter-rouge">Dispatch Queue</code>时，在追加处理的过程中，有时希望不执行已追加的处理。例如演算结果被Block截获时，一些处理会对这个演算结果造成影响。</p>
+
+<p>在这种情况下，只要挂起<code class="highlighter-rouge">Dispatch Queue</code>即可。当可以执行时再恢复。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dispatch_suspend(queue);
+</code></pre></div></div>
+
+<p><code class="highlighter-rouge">dispatch_resume</code> 函数恢复指定的 <code class="highlighter-rouge">Dispatch Queue</code> . 这些函数对已经执行的处理没有影响。挂起后，追加到 <code class="highlighter-rouge">Dispatch Queue</code> 中但尚未执行的处理在此之后停止执行。而恢复则使得这些处理能够继续执行。</p>
+
+<p>分派源创建时默认处于暂停状态，在分派源分派处理程序之前必须先恢复。因为忘记恢复分派源的状态而产生bug是常见的事儿。恢复的方法是调用 <code class="highlighter-rouge">dispatch_resume</code> :</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+</code></pre></div></div>
 
 :ET

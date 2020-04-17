@@ -1,0 +1,733 @@
+I"T�<h2 id="1-遇到的问题">1. 遇到的问题</h2>
+<p>在项目中经常会遇到这样的问题，一个页面由于内容繁多，结构复杂，后台写了5个接口进行支持，这5个接口互相又没有什么影响，也没什么顺序，但是就是需要把这5个接口的数据全都拿到之后组合一下然后刷新页面。</p>
+
+<p>今天我们主要来谈一下怎么更好的用第的方法来实现上述需求，在iOS里面GCD技术正好可以解决这种问题，当然也有其他方式，只是GCD用起来代码更简洁，实现更优雅。</p>
+
+<h3 id="11-解决方法">1.1 解决方法</h3>
+<p>说到用GCD来解决，其实也有很多解决方法，我们先来说一种解决方法</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>//获取一下系统提供的全局队列
+dispatch_queue_t queue =  dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+
+//新建一个组
+dispatch_group_t group = dispatch_group_create();
+
+dispatch_group_async(group, queue, ^{
+        
+    //创建一个计数信号Dispatch Semaphore 初始值设为0
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+        
+    //发起第一个网络请求
+    [Network GET:@"api" completion:^(id  _Nonnull result) {
+        
+        NSLog(@"网络请求1,执行完成");
+        
+        //将Dispatch Semaphore计数信号值加1 这个要写到网络请求的回调里，无论成功失败。
+        dispatch_semaphore_signal(semaphore);
+
+    }];
+    
+    //一直等待，直到Dispatch Semaphore的计数值达到大于等于1
+    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+});
+
+.
+.
+. /* 中间三个请求是一模一样的，所以就先省略。 */
+.
+.
+
+dispatch_group_async(group, queue, ^{
+        
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+        
+    //发起第5个网络请求 
+    [Network GET:@"api" completion:^(id  _Nonnull result) {
+        NSLog(@"网络请求5,执行完成");
+        dispatch_semaphore_signal(semaphore);
+    }];
+        
+    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+});
+
+//全部执行结束
+dispatch_group_notify(group, queue, ^{
+    NSLog(@"请求全部执行结束");
+});
+
+</code></pre></div></div>
+<p>日志输出</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>2019-11-19 20:04:36.258363+0800 GCD-demo[8104:784197] 网络请求3,执行完成
+2019-11-19 20:04:36.258383+0800 GCD-demo[8104:784200] 网络请求5,执行完成
+2019-11-19 20:04:36.258418+0800 GCD-demo[8104:784198] 网络请求1,执行完成
+2019-11-19 20:04:36.258425+0800 GCD-demo[8104:784196] 网络请求2,执行完成
+2019-11-19 20:04:36.258429+0800 GCD-demo[8104:784199] 网络请求4,执行完成
+2019-11-19 20:04:36.258642+0800 GCD-demo[8104:784163] 请求全部执行结束
+</code></pre></div></div>
+
+<p>以上就是GCD异步并发实现五个请求的一种方法。</p>
+
+<p>下面我们解释一下这种方法为什么要这么写，实现原理，以及各个GCD中函数的含义及用法。</p>
+
+<h2 id="2gcd的api">2.GCD的API</h2>
+
+<h3 id="21-什么是dispatch-queue">2.1 什么是Dispatch Queue</h3>
+<p>Dispatch Queue就是执行处理的等待队列。程序猿们通过<code class="highlighter-rouge">dispatch_async</code>等一些函数API在Block中写一些自己想执行的代码，并追加的Dispatch Queue中。然后Dispatch Queue按照追加的顺序（学术用语先进先出FIFO）执行处理。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dispatch_async(queue, ^
+    //想要执行的处理
+});
+</code></pre></div></div>
+<p>执行处理时存在两种Dispatch Queue，一种是串行队列Serial Dispatch Queue，一种是并行队列Concurrent Dispatch Queue。</p>
+
+<h3 id="22-如何得到一个dispatch-queue">2.2. 如何得到一个Dispatch Queue</h3>
+<p>得到Dispatch Queue有两种方法，一种是通过GCD的API生成，另一种是获取系统标准提供的Dispatch Queue。</p>
+<h4 id="221-通过gcd的api生成">2.2.1 通过GCD的API生成</h4>
+<p>通过<code class="highlighter-rouge">dispatch_queue_create</code>函数可生成Dispatch Queue。</p>
+<ul>
+  <li>生成一个Serial Dispatch串行队列
+    <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dispatch_queue_t mySerialDispatchQueue = dispatch_queue_create("mySerialDispacthQueue", NULL);
+</code></pre></div>    </div>
+    <p>该函数的第一个参数指定串行队列的名称，例如上面的例子，Dispatch Queue的名称推荐使用应用程序的ID这种逆序全程域名，这样命名简单易懂，方便调试，。当然你也可以设为NULL，但调试时候不是那么方便。第二个参数指定为NULL,当然你也可以设DISPATCH_QUEUE_SERIAL不过没什么意义，本身DISPATCH_QUEUE_SERIAL就是NULL，不信看API啊。</p>
+  </li>
+  <li>生成一个Concurrent Dispatch Queue 并行队列
+    <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dispatch_queue_t myConcurrentDispatchQueue = dispatch_queue_create("myConcurrentDispatchQueue", DISPATCH_QUEUE_CONCURRENT);
+</code></pre></div>    </div>
+    <p>生成并行队列的时候第一个参数同上，第二个参数必须写DISPATCH_QUEUE_CONCURRENT。</p>
+  </li>
+</ul>
+
+<h4 id="222-获取系统标准提供的dispatch-queue">2.2.2 获取系统标准提供的Dispatch Queue</h4>
+<p>实际上呢，也不用特意去生成Dispatch Queue，系统会给我们提供几个，比如Main Dispatch Queue和Global Dispatch Queue。</p>
+
+<p>Main Dispatch Queue是在主线程执行的队列，因为主线程只有1个，所以Main Dispatch Queue是Serial Dispatch Queue串行队列。</p>
+
+<p>而Global Dispatch Queue是所有应用程序都能使用的Concurrent Dispatch Queue，一般没必要通过函数<code class="highlighter-rouge">dispatch_queue_create</code>逐个生成Concurrent Dispatch Queue。只要获取一下系统提供的Global Dispatch Queue使用即可。另外呢Global Dispatch Queue有4个执行优先级，分别是高优先级（High Priority）、默认优先级（Default Priority）、低优先级（Low Priority）和后台优先级（Background Priority）。</p>
+
+<p>系统提供的Dispatch Queue种类如下表所示。</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">名称</th>
+      <th style="text-align: left">种类</th>
+      <th style="text-align: left">说明</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Main Dispatch Queue</td>
+      <td style="text-align: left">Serial Dispatch Queue</td>
+      <td style="text-align: left">主线程执行</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Global Dispatch Queue(High Priority)</td>
+      <td style="text-align: left">Concurrent Dispatch queue</td>
+      <td style="text-align: left">执行优先级：高（最高优先）</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Global Dispatch Queue(Default Priority)</td>
+      <td style="text-align: left">Concurrent Dispatch queue</td>
+      <td style="text-align: left">执行优先级：默认</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Global Dispatch Queue(Low Priority)</td>
+      <td style="text-align: left">Concurrent Dispatch queue</td>
+      <td style="text-align: left">执行优先级：低</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Global Dispatch Queue(Background Priority)</td>
+      <td style="text-align: left">Concurrent Dispatch queue</td>
+      <td style="text-align: left">执行优先级：后台</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>各种Dispatch Queue 的获取方法如下。</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// Main Dispatch Queue 的获取方法
+dispatch_queue_t mainDispatchQueue = dispatch_get_main_queue();
+
+//  Global Dispatch Queue (最高优先级)的获取方法  
+dispatch_queue_t globalDispatchQueueHigh = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0);
+    
+// Global Dispatch Queue (默认优先级)的获取方法 
+dispatch_queue_t globalDispatchQueueDefault = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+// Global Dispatch Queue (低优先级)的获取方法 
+dispatch_queue_t globalDispatchQueueLow = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0);
+    
+// Global Dispatch Queue (后台优先级)的获取方法 
+dispatch_queue_t globalDispatchQueueBackground = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0);
+</code></pre></div></div>
+
+<h4 id="223-gcd同步和异步方法">2.2.3 GCD同步和异步方法</h4>
+
+<ul>
+  <li>同步操作</li>
+</ul>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dispatch_sync(&lt;#dispatch_queue_t  _Nonnull queue#&gt;, &lt;#^(void)block#&gt;)
+</code></pre></div></div>
+
+<ul>
+  <li>异步操作</li>
+</ul>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dispatch_async(&lt;#dispatch_queue_t  _Nonnull queue#&gt;, &lt;#^(void)block#&gt;)
+</code></pre></div></div>
+
+<h4 id="224-串行并行队列和同步异步结合分析">2.2.4 串行、并行队列和同步、异步结合分析</h4>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: center"> </th>
+      <th style="text-align: center">dispatch_sync</th>
+      <th style="text-align: center">dispatch_async</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: center">串行队列</td>
+      <td style="text-align: center">不开启新线程,在当前线程按序执行任务</td>
+      <td style="text-align: center">开启一条新的线程，新创建的线程中任务是串行的</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">主队列</td>
+      <td style="text-align: center">不开启新线程,在主线线程按序执行任务;<code class="highlighter-rouge">如果在主线程使用这种组合会死锁</code></td>
+      <td style="text-align: center">不开启新线程,在主线线程按序执行任务</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">并发 / 全局并发队列</td>
+      <td style="text-align: center">不开启新线程,在当前线程按序执行任务</td>
+      <td style="text-align: center">可以同时开启多条线程,任务是并发执行的,具体开启多少条线程有GCD自动根据CPU情况决定</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="23-dispatch-group">2.3 Dispatch Group</h3>
+
+<p>Dispatch Group就是我们刚开始抛出的问题解决方案中的主要函数，其作用就是把并发的几个队列Dispatch Queue任务加到组里，然后调用<code class="highlighter-rouge">dispatch_group_notify</code>或者<code class="highlighter-rouge">dispatch_group_wait</code>监听结束。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>//获取一下系统提供的全局队列
+dispatch_queue_t queue =  dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+//新建一个组
+dispatch_group_t group = dispatch_group_create();
+
+dispatch_group_async(group, queue, ^{
+    NSLog(@"第1个任务");
+});
+
+dispatch_group_async(group, queue, ^{
+    NSLog(@"第2个任务");
+});
+
+dispatch_group_async(group, queue, ^{
+    NSLog(@"第3个任务");
+});
+
+dispatch_group_async(group, queue, ^{
+    NSLog(@"第4个任务");
+});
+
+//全部执行结束
+dispatch_group_notify(group, queue, ^{
+    NSLog(@"请求全部执行结束");
+});    
+</code></pre></div></div>
+
+<p>输出日志</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>2019-11-19 19:50:12.347291+0800 GCD-demo[7994:761684] 第2个任务
+2019-11-19 19:50:12.347291+0800 GCD-demo[7994:761686] 第3个任务
+2019-11-19 19:50:12.347292+0800 GCD-demo[7994:761683] 第1个任务
+2019-11-19 19:50:12.347317+0800 GCD-demo[7994:761685] 第4个任务
+2019-11-19 19:50:12.347453+0800 GCD-demo[7994:761685] 请求全部执行结束
+</code></pre></div></div>
+<p>因为想Global Dispatch Queue即Concurrent Dispatch Queue追加处理，多个线程并行执行，所以追加处理的执行顺序不定。执行时会发生变化，但是执行结果一定是最后输出的。</p>
+
+<p>无论想什么样的Dispatch Queue中追加处理，使用Dispatch Group都可以监视这些处理执行的结束。一旦检测到所有的处理执行结束，就可将结束的处理追加到Dispatch Queue中。这就是使用Dispatch Group的原因所在。</p>
+
+<p>下面简单解释一下上面代码的含义，首先<code class="highlighter-rouge">dispatch_group_create</code>函数生成<code class="highlighter-rouge">dispatch_group_t</code>类型的Dispatch Group。然后调用<code class="highlighter-rouge">dispatch_group_async</code>函数追加处理，最后用<code class="highlighter-rouge">dispatch_group_notify</code>监视处理执行的结束。<code class="highlighter-rouge">dispatch_group_async</code>与Dispatch Queue的<code class="highlighter-rouge">dispatch_async</code>函数作用相同，都是将Block的代码追加到Dispatch Queue中。不同点是<code class="highlighter-rouge">dispatch_group_async</code>需要将指定的Dispatch Group作为第一个参数。<code class="highlighter-rouge">dispatch_group_notify</code>函数的第一个参数是指定要监视的Dispatch Group。在追加到该Dispatch Group的全部处理执行结束的时候，将第三个参数的Block追加到第二个参数的Dispatch Queue中。</p>
+
+<p>当然，第二个参数也不是必须是<code class="highlighter-rouge">dispatch_group_async</code>函数中的Dispatch Queue，可以是任意的Dispatch Queue。Dispatch Group还有一个监视结束的函数<code class="highlighter-rouge">dispatch_group_wait</code>,这个函数需要两个参数，一个是要监视的Dispatch Group,另一个是等待时间。</p>
+
+<h3 id="24-dispatch-semaphore">2.4 Dispatch Semaphore</h3>
+<p>GCD函数Dispatch Semaphore信号量。</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>//创建信号量，参数：信号量的初值，如果小于0则会返回NULL
+dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+
+//等待降低信号量，等待时间为DISPATCH_TIME_FOREVER时即永久，直到信号量大于或等于1，函数会对信号量的值进行减1操作，然后返回
+dispatch_semaphore_wait（信号量，等待时间）
+
+//信号量加1
+dispatch_semaphore_signal(信号量)
+</code></pre></div></div>
+<p>生成Dispatch Semaphore需要一个初始值，这个初始值就是信号量数值。</p>
+
+<h4 id="241-dispatch_semaphore_t创建多线程网络同步请求">2.4.1 dispatch_semaphore_t创建多线程网络同步请求</h4>
+
+<p>我们用一开始文章开头抛出的问题来说一下这个Dispatch Semaphore的用法。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dispatch_group_async(group, queue, ^{
+
+    //创建一个Dispatch Semaphore初始值为0    
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+    
+    //发起网络请求
+    [Network GET:@"api" completion:^(id  _Nonnull result) {
+        NSLog(@"网络请求完成");
+        //信号量加1
+        dispatch_semaphore_signal(semaphore);
+    }];
+
+    //等待Dispatch Semaphore的计数值达到大于或者等于1
+    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+});
+</code></pre></div></div>
+<p>首先我们先想一下，如果<strong>这个例子不写Dispatch Semaphore</strong>会怎么样。我们来看一下输出日志。</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>2019-11-19 20:53:40.277849+0800 GCD-demo[8633:900152] 请求全部执行结束
+2019-11-19 20:53:50.277986+0800 GCD-demo[8633:900129] 网络请求1,执行完成
+2019-11-19 20:53:50.277993+0800 GCD-demo[8633:900127] 网络请求2,执行完成
+2019-11-19 20:53:50.277996+0800 GCD-demo[8633:900151] 网络请求5,执行完成
+2019-11-19 20:53:50.278000+0800 GCD-demo[8633:900130] 网络请求4,执行完成
+2019-11-19 20:53:50.278008+0800 GCD-demo[8633:900128] 网络请求3,执行完成
+</code></pre></div></div>
+<p>出现上面的情况，<code class="highlighter-rouge">dispatch_group_notify</code>监视到整个Dispatch Group已经结束，然而，网络请求还没有完成。因此，我们需要一个信号，告诉<code class="highlighter-rouge">dispatch_group_async</code>函数，什么时候才是真正的完成的执行处理。</p>
+
+<p>Dispatch Semaphore正好就是干这个事情的，我们先声明一个Dispatch Semaphore，初始值就是0，然后执行<code class="highlighter-rouge">dispatch_semaphore_wait</code>函数，<code class="highlighter-rouge">dispatch_semaphore_wait</code>函数需要两个入参，分别是等待的Dispatch Semaphore还有等待时间。Dispatch Semaphore在设定的等待时间内检测到信号量小于1，就会一直等待，直到网络请求完成，<code class="highlighter-rouge">dispatch_semaphore_signal</code>函数把信号量的值加1，使其Dispatch Semaphore的计数值达到大于等于1，或者超时。达到其中一个条件就会告诉<code class="highlighter-rouge">dispatch_group_async</code>函数此次执行处理完成。</p>
+
+<h4 id="242-dispatch_semaphore_t设置最大并发数">2.4.2 dispatch_semaphore_t设置最大并发数</h4>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>//获取一下系统提供的全局队列DISPATCH_QUEUE_CONCURRENT 生成一个并发队列
+dispatch_queue_t queue = dispatch_queue_create("myConcurrentDispatchQueue", DISPATCH_QUEUE_CONCURRENT);
+
+//创建一个Dispatch Semaphore初始值为2
+dispatch_semaphore_t semaphore = dispatch_semaphore_create(2);
+
+//新建一个组
+dispatch_group_t group = dispatch_group_create();
+ 
+for (int i = 0; i &lt; 10; i++) {
+    dispatch_group_async(group, queue, ^{
+    		dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+    		
+    		// 线程操作区域 最多有两个线程在此工作
+    		
+    		dispatch_semaphore_signal(semaphore);
+    });
+}
+
+//全部执行结束
+dispatch_group_notify(group, queue, ^{
+    NSLog(@"全部执行结束");
+});
+</code></pre></div></div>
+
+<p>通过设置<code class="highlighter-rouge">dispatch_semaphore_create</code>参数为2，利用Dispatch Semaphore的特性<code class="highlighter-rouge">dispatch_semaphore_wait</code>与<code class="highlighter-rouge">dispatch_semaphore_signal</code>之间最多有两个线程在工作，从而达到设置队列的最大并发数的目的。</p>
+
+<h3 id="25-dispatch-barrier">2.5 Dispatch Barrier</h3>
+
+<p>栅栏函数，等待在Dispatch Barrier前面插入队列的任务先执行完，再执行后面的任务。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// queue: 将barrier添加到的队列 , block: barrier执行的任务
+void dispatch_barrier_sync(dispatch_queue_t queue, dispatch_block_t block);
+void dispatch_barrier_async(dispatch_queue_t queue, dispatch_block_t block);
+</code></pre></div></div>
+
+<h4 id="251-dispatch_barrier_sync">2.5.1 dispatch_barrier_sync</h4>
+
+<p>dispatch_barrier_sync将自己的任务插入到队列的时候，需要等待自己的任务结束之后才会继续插入被写在它后面的任务，然后执行它们。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 创建Concurrent Dispatch Queue 并行队列
+dispatch_queue_t concurrentQueue = dispatch_queue_create("concurrentQueue", DISPATCH_QUEUE_CONCURRENT);
+
+// 向队列中添加任务
+dispatch_async(concurrentQueue, ^{
+   NSLog(@"第1个任务");
+});
+
+dispatch_async(concurrentQueue, ^{
+   NSLog(@"第2个任务");
+});
+
+// dispatch_barrier_sync 添加任务
+dispatch_barrier_sync(concurrentQueue, ^{
+    sleep(1);
+   NSLog(@"Dispatch Barrier任务");
+});
+
+NSLog(@"主线程任务1");
+
+dispatch_async(concurrentQueue, ^{
+    NSLog(@"第3个任务");
+});
+
+dispatch_async(concurrentQueue, ^{
+    NSLog(@"第4个任务");
+});
+
+NSLog(@"主线程任务2");
+</code></pre></div></div>
+
+<p>输出日志</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>2019-11-20 17:58:13.737806+0800 GCD-demo[51368:20064429] 第1个任务
+2019-11-20 17:58:13.737831+0800 GCD-demo[51368:20064430] 第2个任务
+2019-11-20 17:58:14.739234+0800 GCD-demo[51368:20064366] Dispatch Barrier任务
+2019-11-20 17:58:14.739529+0800 GCD-demo[51368:20064366] 主线程任务1
+2019-11-20 17:58:14.739739+0800 GCD-demo[51368:20064366] 主线程任务2
+2019-11-20 17:58:14.739773+0800 GCD-demo[51368:20064430] 第3个任务
+2019-11-20 17:58:14.739778+0800 GCD-demo[51368:20064429] 第4个任务
+</code></pre></div></div>
+
+<p>由此可见，<code class="highlighter-rouge">dispatch_barrier_sync</code>必须等待自己任务结束，才会把后续任务添加到队列，然后执行它们。</p>
+
+<h4 id="252-dispatch_barrier_async">2.5.2 dispatch_barrier_async</h4>
+
+<p>dispatch_barrier_async将自己的任务插入到队列之后，不会等待自己的任务结束，它会继续把后面的任务插入到队列，然后等待自己的任务结束后才执行后面任务。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 创建Concurrent Dispatch Queue 并行队列
+dispatch_queue_t concurrentQueue = dispatch_queue_create("concurrentQueue", DISPATCH_QUEUE_CONCURRENT);
+
+// 向队列中添加任务
+dispatch_async(concurrentQueue, ^{
+   NSLog(@"第1个任务");
+});
+
+dispatch_async(concurrentQueue, ^{
+   NSLog(@"第2个任务");
+});
+
+// dispatch_barrier_async 添加任务
+dispatch_barrier_async(concurrentQueue, ^{
+    sleep(1);
+   NSLog(@"Dispatch Barrier任务");
+});
+
+NSLog(@"主线程任务1");
+
+dispatch_async(concurrentQueue, ^{
+    NSLog(@"第3个任务");
+});
+
+dispatch_async(concurrentQueue, ^{
+    NSLog(@"第4个任务");
+});
+
+NSLog(@"主线程任务2");
+</code></pre></div></div>
+
+<p>输出日志</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>2019-11-20 17:54:05.535233+0800 GCD-demo[51346:20058026] 主线程任务1
+2019-11-20 17:54:05.535251+0800 GCD-demo[51346:20058062] 第1个任务
+2019-11-20 17:54:05.535263+0800 GCD-demo[51346:20058060] 第2个任务
+2019-11-20 17:54:05.535402+0800 GCD-demo[51346:20058026] 主线程任务2
+2019-11-20 17:54:06.539084+0800 GCD-demo[51346:20058060] Dispatch Barrier任务
+2019-11-20 17:54:06.539451+0800 GCD-demo[51346:20058062] 第4个任务
+2019-11-20 17:54:06.539438+0800 GCD-demo[51346:20058060] 第3个任务
+</code></pre></div></div>
+
+<p>由此可见，<code class="highlighter-rouge">dispatch_barrier_async</code>不会拦截后续任务加载到队列，但后续任务必须等待<code class="highlighter-rouge">dispatch_barrier_async</code>任务执行结束，后续任务才可执行</p>
+
+<h3 id="26-dispatch-source">2.6 Dispatch Source</h3>
+
+<p>GCD中除了主要的 <code class="highlighter-rouge">Dispatch Queue</code> 外，还有不太引人注目的 <code class="highlighter-rouge">Dispatch Source</code> 。使用 <code class="highlighter-rouge">Dispatch Source</code>而不使用 <code class="highlighter-rouge">Dispatch Queue</code>唯一原因就是利用联结的优势。</p>
+
+<p>联结的大致流程：在任一线程上调用它的的一个函数 <code class="highlighter-rouge">dispatch_source_merge_data</code> 后，会执行 <code class="highlighter-rouge">Dispatch Source</code> 事先定义好的句柄（可以把句柄简单理解为一个 block ）。</p>
+
+<p>这个过程叫 <code class="highlighter-rouge">Custom event</code> ,用户事件。是 dispatch source 支持处理的一种事件。</p>
+
+<blockquote>
+  <p>简单地说，这种事件是由你调用 <code class="highlighter-rouge">dispatch_source_merge_data</code> 函数来向自己发出的信号。</p>
+</blockquote>
+
+<h4 id="261-创建一个dispatch-source">2.6.1 创建一个Dispatch Source</h4>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// API
+dispatch_source_t source = dispatch_source_create(dispatch_source_type_t type, uintptr_t handle, unsigned long mask, dispatch_queue_t queue)
+
+// 指定DISPATCH_SOURCE_TYPE_DATA_ADD，做成Dispatch Source(分派源)。设定Main Dispatch Queue 为追加处理的Dispatch Queue
+_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_ADD, 0, 0, dispatch_get_main_queue());
+</code></pre></div></div>
+
+<p><strong>参数：</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>参数</th>
+      <th>意义</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>type</td>
+      <td>dispatch源可处理的事件</td>
+    </tr>
+    <tr>
+      <td>handle</td>
+      <td>可以理解为句柄、索引或id，假如要监听进程，需要传入进程的ID</td>
+    </tr>
+    <tr>
+      <td>mask</td>
+      <td>可以理解为描述，提供更详细的描述，让它知道具体要监听什么</td>
+    </tr>
+    <tr>
+      <td>queue</td>
+      <td>自定义源需要的一个队列，用来处理所有的响应句柄（block）</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="highlighter-rouge">Dispatch Source</code> 可处理的所有事件。如下表所示：</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>名称</th>
+      <th>内容</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_DATA_ADD</code></td>
+      <td>变量增加</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_DATA_OR</code></td>
+      <td>变量OR</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_MACH_SEND</code></td>
+      <td>MACH端口发送</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_MACH_RECV</code></td>
+      <td>MACH端口接收</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_PROC</code></td>
+      <td>监测到与进程相关的事件</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_READ</code></td>
+      <td>可读取文件映像</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_SIGNAL</code></td>
+      <td>接收信号</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_TIMER</code></td>
+      <td>定时器</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_VNODE</code></td>
+      <td>文件系统有变更</td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">DISPATCH_SOURCE_TYPE_WRITE</code></td>
+      <td>可写入文件映像</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>自定义源也需要一个队列，用来处理所有的响应句柄（block）。那么岂不是有两个队列了？没错，至于 <code class="highlighter-rouge">Dispatch Queue</code> 这个队列的线程执行与 <code class="highlighter-rouge">Dispatch Source</code>这个队列的线程执行的关系，下文会详细介绍。</p>
+
+<h4 id="262-处理dispatch-source的暂停与恢复操作">2.6.2 处理Dispatch Source的暂停与恢复操作</h4>
+
+<p>当追加大量处理到<code class="highlighter-rouge">Dispatch Queue</code>时，在追加处理的过程中，有时希望不执行已追加的处理。例如演算结果被Block截获时，一些处理会对这个演算结果造成影响。</p>
+
+<p>在这种情况下，只要挂起<code class="highlighter-rouge">Dispatch Queue</code>即可。当可以执行时再恢复。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dispatch_suspend(queue);
+</code></pre></div></div>
+
+<p><code class="highlighter-rouge">dispatch_resume</code> 函数恢复指定的 <code class="highlighter-rouge">Dispatch Queue</code> . 这些函数对已经执行的处理没有影响。挂起后，追加到 <code class="highlighter-rouge">Dispatch Queue</code> 中但尚未执行的处理在此之后停止执行。而恢复则使得这些处理能够继续执行。</p>
+
+<p>分派源创建时默认处于暂停状态，在分派源分派处理程序之前必须先恢复。因为忘记恢复分派源的状态而产生bug是常见的事儿。恢复的方法是调用 <code class="highlighter-rouge">dispatch_resume</code> :</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dispatch_resume (source);
+</code></pre></div></div>
+
+<p>思考下NSLog的打印顺序为什么会是这样？</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dispatch_queue_t queue1 = dispatch_queue_create("com.serial.queue1", DISPATCH_QUEUE_SERIAL);
+dispatch_queue_t queue2 = dispatch_queue_create("com.serial.queue2", DISPATCH_QUEUE_SERIAL);
+dispatch_group_t group = dispatch_group_create();
+
+dispatch_async(queue1, ^{
+   NSLog(@"任务 1 ： queue 1...");
+   sleep(1);
+   NSLog(@"✅完成任务 1");
+});
+
+dispatch_async(queue2, ^{
+   NSLog(@"任务 1 ： queue 2...");
+   sleep(1);
+   NSLog(@"✅完成任务 2");
+});
+
+dispatch_group_async(group, queue1, ^{
+   NSLog(@"🚫正在暂停 1");
+   dispatch_suspend(queue1);
+});
+dispatch_group_async(group, queue2, ^{
+   NSLog(@"🚫正在暂停 2");
+   dispatch_suspend(queue2);
+});
+
+dispatch_group_wait(group, DISPATCH_TIME_FOREVER);
+NSLog(@"＝＝＝＝＝＝＝等待两个queue完成, 再往下进行...");
+dispatch_async(queue1, ^{
+   NSLog(@"任务 2 ： queue 1");
+});
+dispatch_async(queue2, ^{
+   NSLog(@"任务 2 ： queue 2");
+});
+NSLog(@"🔴为什么这个NSLog会在上面两个NSLog之前打印❓❓答：dispatch_suspend的作用‼️");
+
+dispatch_resume(queue1);
+dispatch_resume(queue2);
+</code></pre></div></div>
+
+<p>打印日志：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>2020-04-17 15:41:45.049437+0800 多线程-demo[54147:1097252] 任务 1 ： queue 2...
+2020-04-17 15:41:45.049437+0800 多线程-demo[54147:1097254] 任务 1 ： queue 1...
+2020-04-17 15:41:46.053559+0800 多线程-demo[54147:1097252] ✅完成任务 2
+2020-04-17 15:41:46.053569+0800 多线程-demo[54147:1097254] ✅完成任务 1
+2020-04-17 15:41:46.053820+0800 多线程-demo[54147:1097252] 🚫正在暂停 2
+2020-04-17 15:41:46.053830+0800 多线程-demo[54147:1097254] 🚫正在暂停 1
+2020-04-17 15:41:46.053986+0800 多线程-demo[54147:1096499] ＝＝＝＝＝＝＝等待两个queue完成, 再往下进行...
+2020-04-17 15:41:46.054112+0800 多线程-demo[54147:1096499] 🔴为什么这个NSLog会在上面两个NSLog之前打印❓❓答：dispatch_suspend的作用‼️
+2020-04-17 15:41:46.054279+0800 多线程-demo[54147:1097252] 任务 2 ： queue 1
+2020-04-17 15:41:46.054282+0800 多线程-demo[54147:1097254] 任务 2 ： queue 2
+</code></pre></div></div>
+
+<h4 id="263-创建dispatch-source的事件处理">2.6.3 创建Dispatch Source的事件处理</h4>
+
+<p>创建源后，需要提供相应的处理方法。当源生效时会分派注册处理方法;当事件发生时会分派事件处理方法;当源被取消时会分派取消处理方法。自定义源通常只需要一个事件处理方法，可以像这样创建:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 指定DISPATCH_SOURCE_TYPE_DATA_ADD，做成Dispatch Source(分派源)。设定Main Dispatch Queue 为追加处理的Dispatch Queue
+_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_ADD, 0, 0, dispatch_get_main_queue());
+
+__block NSUInteger totalComplete = 0;
+dispatch_source_set_event_handler(_source, ^{
+    //当处理事件被最终执行时，计算后的数据可以通过dispatch_source_get_data来获取。这个数据的值在每次响应事件执行后会被重置，所以totalComplete的值是最终累积的值。
+    NSUInteger value = dispatch_source_get_data(self-&gt;_source);
+    totalComplete += value;
+    NSLog(@"进度：%@", @((CGFloat)totalComplete/100));
+    NSLog(@"🔵线程号：%@", [NSThread currentThread]);
+});
+
+// 分派源创建时默认处于暂停状态，在分派源分派处理程序之前必须先恢复。
+dispatch_resume(_source);
+NSLog(@"✅恢复Dispatch Source(分派源)");
+
+// 恢复源后，就可以通过dispatch_source_merge_data向Dispatch Source(分派源)发送事件:
+dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+dispatch_async(queue, ^{
+    for (NSUInteger index = 0; index &lt; 100; index++) {
+        dispatch_source_merge_data(self-&gt;_source, 1);
+        NSLog(@"♻️线程号：%@", [NSThread currentThread]);
+        usleep(20000);//0.02秒
+    }
+});
+</code></pre></div></div>
+
+<p>打印日志：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>2020-04-17 15:45:39.260746+0800 多线程-demo[54302:1102537] ✅恢复Dispatch Source(分派源)
+2020-04-17 15:45:39.260746+0800 多线程-demo[54302:1102537] ♻️线程号：&lt;NSThread: 0x60000274d880&gt;{number = 5, name = (null)}
+2020-04-17 15:45:39.275313+0800 多线程-demo[54302:1102090] 进度：0.01
+2020-04-17 15:45:39.275452+0800 多线程-demo[54302:1102090] 🔵线程号：&lt;NSThread: 0x60000275ae40&gt;{number = 1, name = main}
+2020-04-17 15:45:39.281218+0800 多线程-demo[54302:1102537] ♻️线程号：&lt;NSThread: 0x60000274d880&gt;{number = 5, name = (null)}
+2020-04-17 15:45:39.287779+0800 多线程-demo[54302:1102090] 进度：0.02
+2020-04-17 15:45:39.287941+0800 多线程-demo[54302:1102090] 🔵线程号：&lt;NSThread: 0x60000275ae40&gt;{number = 1, name = main}
+2020-04-17 15:45:39.301559+0800 多线程-demo[54302:1102537] ♻️线程号：&lt;NSThread: 0x60000274d880&gt;{number = 5, name = (null)}
+/*================省略中间====================*/
+2020-04-17 15:45:41.553927+0800 多线程-demo[54302:1102090] 进度：0.98
+2020-04-17 15:45:41.553975+0800 多线程-demo[54302:1102537] ♻️线程号：&lt;NSThread: 0x60000274d880&gt;{number = 5, name = (null)}
+2020-04-17 15:45:41.554374+0800 多线程-demo[54302:1102090] 🔵线程号：&lt;NSThread: 0x60000275ae40&gt;{number = 1, name = main}
+2020-04-17 15:45:41.577753+0800 多线程-demo[54302:1102090] 进度：0.99
+2020-04-17 15:45:41.577754+0800 多线程-demo[54302:1102537] ♻️线程号：&lt;NSThread: 0x60000274d880&gt;{number = 5, name = (null)}
+2020-04-17 15:45:41.578062+0800 多线程-demo[54302:1102090] 🔵线程号：&lt;NSThread: 0x60000275ae40&gt;{number = 1, name = main}
+2020-04-17 15:45:41.603169+0800 多线程-demo[54302:1102537] ♻️线程号：&lt;NSThread: 0x60000274d880&gt;{number = 5, name = (null)}
+2020-04-17 15:45:41.603189+0800 多线程-demo[54302:1102090] 进度：1
+2020-04-17 15:45:41.603444+0800 多线程-demo[54302:1102090] 🔵线程号：&lt;NSThread: 0x60000275ae40&gt;{number = 1, name = main}
+</code></pre></div></div>
+
+<p>耗时：2.343</p>
+
+<p>在同一时间，只有一个处理方法块的实例被分派。如果这个处理方法还没有执行完毕，另一个事件就发生了，事件会以指定方式(ADD或者OR)进行累积。通过合并事件的方式，系统即使在高负 载情况下也能正常工作。当处理事件件被最终执行时，计算后的数据可以通过 <code class="highlighter-rouge">dispatch_source_get_data</code> 来获取。这个数据的值在每次响应事件执行后会被重置，所以上面例子中 <code class="highlighter-rouge">totalComplete</code> 的值是最终累积的值。</p>
+
+<p>恢复源后，就可以像下面的代码片段这样，通过 <code class="highlighter-rouge">dispatch_source_merge_data</code> 向分派源发送事件。在每次循环中执行加1操作。也可以传递已处理记录的数目或已写入的字节数。在任何线程中都可以调用 <code class="highlighter-rouge">dispatch_source_merge_data</code> 。需要注意的是，不可以传递0值(事件不会被触发)，同样也不可以传递负数。</p>
+
+<h4 id="263-dispatch-source能通过合并事件的方式确保在高负载下正常工作">2.6.3 Dispatch Source能通过合并事件的方式确保在高负载下正常工作</h4>
+
+<p>上部分代码还可以进行如下优化：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 指定DISPATCH_SOURCE_TYPE_DATA_ADD，做成Dispatch Source(分派源)。设定 global Dispatch Queue 为追加处理的Dispatch Queue
+_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_ADD, 0, 0, dispatch_get_global_queue(0, 0));
+
+__block NSUInteger totalComplete = 0;
+dispatch_source_set_event_handler(_source, ^{
+    //当处理事件被最终执行时，计算后的数据可以通过dispatch_source_get_data来获取。这个数据的值在每次响应事件执行后会被重置，所以totalComplete的值是最终累积的值。
+    NSUInteger value = dispatch_source_get_data(self-&gt;_source);
+    totalComplete += value;
+    NSLog(@"进度：%@", @((CGFloat)totalComplete/100));
+    NSLog(@"🔵线程号：%@", [NSThread currentThread]);
+});
+
+// 分派源创建时默认处于暂停状态，在分派源分派处理程序之前必须先恢复。
+dispatch_resume(_source);
+NSLog(@"✅恢复Dispatch Source(分派源)");
+
+//恢复源后，就可以通过dispatch_source_merge_data向Dispatch Source(分派源)发送事件:
+dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+for (NSUInteger index = 0; index &lt; 100; index++) {
+   dispatch_async(queue, ^{
+       dispatch_source_merge_data(self-&gt;_source, 1);
+       NSLog(@"♻️线程号：%@", [NSThread currentThread]);
+       usleep(20000);//0.02秒
+   });
+}
+</code></pre></div></div>
+
+<p>打印日志：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>2020-04-17 16:06:32.071589+0800 多线程-demo[54925:1125521] ✅恢复Dispatch Source(分派源)
+2020-04-17 16:06:32.071854+0800 多线程-demo[54925:1126037] ♻️线程号：&lt;NSThread: 0x600003dc8680&gt;{number = 7, name = (null)}
+2020-04-17 16:06:32.071854+0800 多线程-demo[54925:1126034] ♻️线程号：&lt;NSThread: 0x600003de0f80&gt;{number = 6, name = (null)}
+2020-04-17 16:06:32.071858+0800 多线程-demo[54925:1126040] ♻️线程号：&lt;NSThread: 0x600003dee440&gt;{number = 3, name = (null)}
+2020-04-17 16:06:32.071859+0800 多线程-demo[54925:1126035] ♻️线程号：&lt;NSThread: 0x600003dd5680&gt;{number = 5, name = (null)}
+2020-04-17 16:06:32.071892+0800 多线程-demo[54925:1126039] ♻️线程号：&lt;NSThread: 0x600003dd54c0&gt;{number = 8, name = (null)}
+2020-04-17 16:06:32.071976+0800 多线程-demo[54925:1126043] ♻️线程号：&lt;NSThread: 0x600003dcf180&gt;{number = 9, name = (null)}
+2020-04-17 16:06:32.071994+0800 多线程-demo[54925:1126044] ♻️线程号：&lt;NSThread: 0x600003de5800&gt;{number = 10, name = (null)}
+/*================省略中间====================*/
+2020-04-17 16:06:32.288005+0800 多线程-demo[54925:1126059] ♻️线程号：&lt;NSThread: 0x600003dd53c0&gt;{number = 25, name = (null)}
+2020-04-17 16:06:32.288000+0800 多线程-demo[54925:1126036] ♻️线程号：&lt;NSThread: 0x600003db0580&gt;{number = 4, name = (null)}
+2020-04-17 16:06:32.288019+0800 多线程-demo[54925:1126044] ♻️线程号：&lt;NSThread: 0x600003de5800&gt;{number = 10, name = (null)}
+2020-04-17 16:06:32.287870+0800 多线程-demo[54925:1126053] ♻️线程号：&lt;NSThread: 0x600003dd5440&gt;{number = 19, name = (null)}
+2020-04-17 16:06:32.288022+0800 多线程-demo[54925:1126099] ♻️线程号：&lt;NSThread: 0x600003de5d80&gt;{number = 65, name = (null)}
+2020-04-17 16:06:32.287878+0800 多线程-demo[54925:1126068] ♻️线程号：&lt;NSThread: 0x600003dc1880&gt;{number = 34, name = (null)}
+2020-04-17 16:06:32.288844+0800 多线程-demo[54925:1126087] 进度：1
+2020-04-17 16:06:32.287878+0800 多线程-demo[54925:1126067] ♻️线程号：&lt;NSThread: 0x600003dcf540&gt;{number = 33, name = (null)}
+2020-04-17 16:06:32.310412+0800 多线程-demo[54925:1126087] 🔵线程号：&lt;NSThread: 0x600003ddb480&gt;{number = 53, name = (null)}
+</code></pre></div></div>
+
+<p>耗时：0.239秒，与之前的2.343秒相比，时间是后者的10倍 ，性能相差很大。</p>
+
+<p>然而上例中也因为并发执行，速度相当快，调用 <code class="highlighter-rouge">dispatch_source_merge_data</code> 后所触发的 <code class="highlighter-rouge">dispatch_source_set_event_handler</code> 的频率也大大减少，有时只会在结束时触发一次。</p>
+
+<p>如果你细心观察下上例中的打印🔵（小蓝点）♻️（小绿点）个数是不一的，但 <code class="highlighter-rouge">totalComplete</code> 的值，或者进度条从0.0到1.0的执行是正常，但是🔵（小蓝点）为什么没有被打印？这是因为：</p>
+
+<blockquote>
+  <p>DispatchSource能通过合并事件的方式确保在高负载下正常工作</p>
+</blockquote>
+
+<p>在同一时间，只有一个处理 block 的实例被分配，如果这个处理方法还没有执行完毕，另一个事件就发生了，事件会以指定方式（ADD或 OR）进行累积。DispatchSource能通过合并事件（block）的方式确保在高负载下正常工作。当处理事件被最终执行时，计算后的数据可以通过 <code class="highlighter-rouge">dispatch_source_get_data</code> 来获取。这个数据的值在每次响应时间执行后会被重置，所以上面的例子中进度条 <code class="highlighter-rouge">totalComplete</code> 的值是最终积累的值，而 block 不是每次都执行的，但打印🔵（小蓝点）♻️（小绿点）个数不一。但能确保进度条能从0.0到1.0的正常执行。</p>
+:ET
