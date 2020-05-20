@@ -1,0 +1,60 @@
+I"}<h3 id="1一个nsobject占用多少内存">1、一个NSObject占用多少内存？</h3>
+
+<p>受限于内存分配的机制，一个 <code class="highlighter-rouge">NSObject</code>对象都会分配 <code class="highlighter-rouge">16byte</code> 的内存空间。但是实际上在 32位系统上，只使用了 <code class="highlighter-rouge">8byte</code>;</p>
+
+<p>一个 NSObject 实例对象成员变量所占的大小，实际上是 8 字节。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>size_t obj_size = class_getInstanceSize([NSObject class]);
+NSLog(@"class_getInstanceSize ---- %zu", obj_size);
+打印日志：class_getInstanceSize ---- 8
+</code></pre></div></div>
+
+<p>我们可以去<code class="highlighter-rouge">runtime</code>的源码里面，相关方法具体是怎么实现的。OC所有开放的源码地址<a href="https://link.jianshu.com/?t=https%3A%2F%2Fopensource.apple.com%2Ftarballs%2F">https://opensource.apple.com/tarballs</a></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// class_getInstanceSize源码实现
+size_t class_getInstanceSize(Class cls) {
+    if (!cls) return 0;
+    return cls-&gt;alignedInstanceSize();
+}
+
+// Class's ivar size rounded up to a pointer-size boundary.
+// 返回的是Class's ivar size,类的成员变量的大小，NSObject对象只有一个isa成员变量，
+// 62位系统下返回的是8个字节
+uint32_t alignedInstanceSize() {
+	return word_align(unalignedInstanceSize());
+}
+
+// alloc的时候分配了多大的内存大小，allocWithZone然后找到_objc_rootAllocWithZone
+// 在这个方法中返回的是class_createInstance(cls, 0)，然后跳转进去，返回值再点击去
+// 可以看到instanceSize，可以看到，CF要求至少得返回16个字节的内存大小。
+size_t instanceSize(size_t extraBytes) {
+	size_t size = alignedInstanceSize() + extraBytes;
+	// CF requires all objects be at least 16 bytes.
+	if (size &lt; 16) size = 16;	
+	return size;
+}
+</code></pre></div></div>
+
+<p>但获取 Obj-C 指针所指向的内存的大小，实际上是16 字节</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>NSObject *obj = [NSObject new];
+size_t m_size = malloc_size((__bridge const void *)obj);
+NSLog(@"malloc_size ---- %zu", m_size);
+打印：malloc_size ---- 16
+</code></pre></div></div>
+<p>最终而言：</p>
+
+<blockquote>
+  <p>一个NSObject占用多少内存？
+ 1、系统分配了16个字节给NSObject对象（可以通过malloc_size函数得到）
+ 2、但NSObject对象内部只使用了8个字节空间（在64bit环境下，可以通过class_getInstanceSize函数获得）</p>
+</blockquote>
+
+<h3 id="2isa源码分析">2、isa源码分析</h3>
+
+<p>在Runtime源码查看isa_t是共用体。简化结构如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+</code></pre></div></div>
+
+:ET

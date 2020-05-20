@@ -1,0 +1,18 @@
+I"�
+<ul>
+  <li><a href="#ios-程序-main函数之前发生什么">iOS 程序 main函数之前发生什么</a>
+    <ul>
+      <li><a href="#1exe">1、exe()</a></li>
+      <li><a href="#2-加载可执行文件">2、 加载可执行文件</a></li>
+      <li><a href="#3加载dyld">3、加载Dyld</a></li>
+      <li><a href="#4加载动态库">4、加载动态库</a></li>
+      <li><a href="#5rebase和bind">5、Rebase和Bind</a></li>
+      <li><a href="#6objc">6、Objc</a></li>
+      <li><a href="#7initializers">7、Initializers</a></li>
+    </ul>
+  </li>
+  <li><a href="#main加载前优化">Main加载前优化：</a></li>
+  <li><a href="#main加载后优化">Main加载后优化</a></li>
+  <li><a href="#参考链接">参考链接</a></li>
+</ul>
+:ET

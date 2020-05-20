@@ -1,0 +1,106 @@
+I"�<h3 id="1一个nsobject占用多少内存">1、一个NSObject占用多少内存？</h3>
+
+<p>受限于内存分配的机制，一个 <code class="highlighter-rouge">NSObject</code>对象都会分配 <code class="highlighter-rouge">16byte</code> 的内存空间。但是实际上在 32位系统上，只使用了 <code class="highlighter-rouge">8byte</code>;</p>
+
+<p>一个 NSObject 实例对象成员变量所占的大小，实际上是 8 字节。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>size_t obj_size = class_getInstanceSize([NSObject class]);
+NSLog(@"class_getInstanceSize ---- %zu", obj_size);
+打印日志：class_getInstanceSize ---- 8
+</code></pre></div></div>
+
+<p>我们可以去<code class="highlighter-rouge">runtime</code>的源码里面，相关方法具体是怎么实现的。OC所有开放的源码地址<a href="https://link.jianshu.com/?t=https%3A%2F%2Fopensource.apple.com%2Ftarballs%2F">https://opensource.apple.com/tarballs</a></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// class_getInstanceSize源码实现
+size_t class_getInstanceSize(Class cls) {
+    if (!cls) return 0;
+    return cls-&gt;alignedInstanceSize();
+}
+
+// Class's ivar size rounded up to a pointer-size boundary.
+// 返回的是Class's ivar size,类的成员变量的大小，NSObject对象只有一个isa成员变量，
+// 62位系统下返回的是8个字节
+uint32_t alignedInstanceSize() {
+	return word_align(unalignedInstanceSize());
+}
+
+// alloc的时候分配了多大的内存大小，allocWithZone然后找到_objc_rootAllocWithZone
+// 在这个方法中返回的是class_createInstance(cls, 0)，然后跳转进去，返回值再点击去
+// 可以看到instanceSize，可以看到，CF要求至少得返回16个字节的内存大小。
+size_t instanceSize(size_t extraBytes) {
+	size_t size = alignedInstanceSize() + extraBytes;
+	// CF requires all objects be at least 16 bytes.
+	if (size &lt; 16) size = 16;	
+	return size;
+}
+</code></pre></div></div>
+
+<p>但获取 Obj-C 指针所指向的内存的大小，实际上是16 字节</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>NSObject *obj = [NSObject new];
+size_t m_size = malloc_size((__bridge const void *)obj);
+NSLog(@"malloc_size ---- %zu", m_size);
+打印：malloc_size ---- 16
+</code></pre></div></div>
+<p>最终而言：</p>
+
+<blockquote>
+  <p>一个NSObject占用多少内存？
+ 1、系统分配了16个字节给NSObject对象（可以通过malloc_size函数得到）
+ 2、但NSObject对象内部只使用了8个字节空间（在64bit环境下，可以通过class_getInstanceSize函数获得）</p>
+</blockquote>
+
+<h3 id="2isa源码分析">2、isa源码分析</h3>
+
+<p>在Runtime源码查看isa_t是共用体。简化结构如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>union isa_t 
+{
+    Class cls;
+    uintptr_t bits;
+    # if __arm64__ // arm64架构
+#   define ISA_MASK        0x0000000ffffffff8ULL //用来取出33位内存地址使用（&amp;）操作
+#   define ISA_MAGIC_MASK  0x000003f000000001ULL
+#   define ISA_MAGIC_VALUE 0x000001a000000001ULL
+    struct {
+        uintptr_t nonpointer        : 1; //0：代表普通指针，1：表示优化过的，可以存储更多信息。
+        uintptr_t has_assoc         : 1; //是否设置过关联对象。如果没有，释放时会更快
+        uintptr_t has_cxx_dtor      : 1; //是否有C++的析构函数。如果没有，释放时会更快
+        uintptr_t shiftcls          : 33; // MACH_VM_MAX_ADDRESS 0x1000000000 内存地址值
+        uintptr_t magic             : 6; //用于在调试时分辨对象是否未完成初始化
+        uintptr_t weakly_referenced : 1; //是否有被弱引用指向过
+        uintptr_t deallocating      : 1; //是否正在释放
+        uintptr_t has_sidetable_rc  : 1; //引用计数器是否过大无法存储在ISA中。如果为1，那么引用计数会存储在一个叫做SideTable的类的属性中
+        uintptr_t extra_rc          : 19; //里面存储的值是引用计数器减1
+
+#       define RC_ONE   (1ULL&lt;&lt;45)
+#       define RC_HALF  (1ULL&lt;&lt;18)
+    };
+
+# elif __x86_64__ // arm86架构,模拟器是arm86
+#   define ISA_MASK        0x00007ffffffffff8ULL
+#   define ISA_MAGIC_MASK  0x001f800000000001ULL
+#   define ISA_MAGIC_VALUE 0x001d800000000001ULL
+    struct {
+        uintptr_t nonpointer        : 1;
+        uintptr_t has_assoc         : 1;
+        uintptr_t has_cxx_dtor      : 1;
+        uintptr_t shiftcls          : 44; // MACH_VM_MAX_ADDRESS 0x7fffffe00000
+        uintptr_t magic             : 6;
+        uintptr_t weakly_referenced : 1;
+        uintptr_t deallocating      : 1;
+        uintptr_t has_sidetable_rc  : 1;
+        uintptr_t extra_rc          : 8;
+#       define RC_ONE   (1ULL&lt;&lt;56)
+#       define RC_HALF  (1ULL&lt;&lt;7)
+    };
+
+# else
+#   error unknown architecture for packed isa
+# endif
+
+}
+
+</code></pre></div></div>
+
+:ET

@@ -1,0 +1,2 @@
+I"<p>一个 iOS App 的 <code class="highlighter-rouge">main</code> 函数位于 main.m 中，这是我们熟知的程序入口。但对 objc 了解更多之后发现，程序在进入我们的 main 函数前已经执行了很多代码，比如熟知的 <code class="highlighter-rouge">+ load</code> 方法等。本文将跟随程序执行顺序，刨根问底，从 <code class="highlighter-rouge">dyld</code> 到 <code class="highlighter-rouge">runtime</code> ，看看 main 函数之前都发生了什么。</p>
+:ET

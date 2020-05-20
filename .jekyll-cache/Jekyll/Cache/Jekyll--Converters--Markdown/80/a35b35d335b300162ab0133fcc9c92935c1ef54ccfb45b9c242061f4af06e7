@@ -1,0 +1,269 @@
+I"�1<p><a href="https://www.jianshu.com/go-wild?ac=2&amp;url=https%3A%2F%2Fopensource.apple.com%2Ftarballs%2Fobjc4%2F">Runtime源码下载</a></p>
+
+<h3 id="1一个nsobject占用多少内存">1、一个NSObject占用多少内存？</h3>
+
+<p>受限于内存分配的机制，一个 <code class="highlighter-rouge">NSObject</code>对象都会分配 <code class="highlighter-rouge">16byte</code> 的内存空间。但是实际上在 32位系统上，只使用了 <code class="highlighter-rouge">8byte</code>;</p>
+
+<p>一个 NSObject 实例对象成员变量所占的大小，实际上是 8 字节。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>size_t obj_size = class_getInstanceSize([NSObject class]);
+NSLog(@"class_getInstanceSize ---- %zu", obj_size);
+打印日志：class_getInstanceSize ---- 8
+</code></pre></div></div>
+
+<p>我们可以去<code class="highlighter-rouge">runtime</code>的源码里面，相关方法具体是怎么实现的。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// class_getInstanceSize源码实现
+size_t class_getInstanceSize(Class cls) {
+    if (!cls) return 0;
+    return cls-&gt;alignedInstanceSize();
+}
+
+// Class's ivar size rounded up to a pointer-size boundary.
+// 返回的是Class's ivar size,类的成员变量的大小，NSObject对象只有一个isa成员变量，
+// 62位系统下返回的是8个字节
+uint32_t alignedInstanceSize() {
+	return word_align(unalignedInstanceSize());
+}
+
+// alloc的时候分配了多大的内存大小，allocWithZone然后找到_objc_rootAllocWithZone
+// 在这个方法中返回的是class_createInstance(cls, 0)，然后跳转进去，返回值再点击去
+// 可以看到instanceSize，可以看到，CF要求至少得返回16个字节的内存大小。
+size_t instanceSize(size_t extraBytes) {
+	size_t size = alignedInstanceSize() + extraBytes;
+	// CF requires all objects be at least 16 bytes.
+	if (size &lt; 16) size = 16;	
+	return size;
+}
+</code></pre></div></div>
+
+<p>但获取 Obj-C 指针所指向的内存的大小，实际上是16 字节</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>NSObject *obj = [NSObject new];
+size_t m_size = malloc_size((__bridge const void *)obj);
+NSLog(@"malloc_size ---- %zu", m_size);
+打印：malloc_size ---- 16
+</code></pre></div></div>
+<p>最终而言：</p>
+
+<blockquote>
+  <p>一个NSObject占用多少内存？
+ 1、系统分配了16个字节给NSObject对象（可以通过malloc_size函数得到）
+ 2、但NSObject对象内部只使用了8个字节空间（在64bit环境下，可以通过class_getInstanceSize函数获得）</p>
+</blockquote>
+
+<h3 id="2isa源码分析">2、isa源码分析</h3>
+
+<p>在Runtime源码查看isa_t是共用体。简化结构如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>union isa_t 
+{
+    Class cls;
+    uintptr_t bits;
+    # if __arm64__ // arm64架构
+#   define ISA_MASK        0x0000000ffffffff8ULL //用来取出33位内存地址使用（&amp;）操作
+#   define ISA_MAGIC_MASK  0x000003f000000001ULL
+#   define ISA_MAGIC_VALUE 0x000001a000000001ULL
+    struct {
+        uintptr_t nonpointer        : 1; //0：代表普通指针，1：表示优化过的，可以存储更多信息。
+        uintptr_t has_assoc         : 1; //是否设置过关联对象。如果没有，释放时会更快
+        uintptr_t has_cxx_dtor      : 1; //是否有C++的析构函数。如果没有，释放时会更快
+        uintptr_t shiftcls          : 33; // 存储着Class 或者 Meta-Class对象的内存地址信息
+        uintptr_t magic             : 6; //用于在调试时分辨对象是否未完成初始化
+        uintptr_t weakly_referenced : 1; //是否有被弱引用指向过。如果没有，释放时会更快
+        uintptr_t deallocating      : 1; //是否正在释放
+        uintptr_t has_sidetable_rc  : 1; //引用计数器是否过大无法存储在ISA中。如果为1，那么引用计数会存储在一个叫做SideTable的类的属性中
+        uintptr_t extra_rc          : 19; //里面存储的值是引用计数器减1
+
+#       define RC_ONE   (1ULL&lt;&lt;45)
+#       define RC_HALF  (1ULL&lt;&lt;18)
+    };
+
+# elif __x86_64__ // arm86架构,模拟器是arm86
+#   define ISA_MASK        0x00007ffffffffff8ULL
+#   define ISA_MAGIC_MASK  0x001f800000000001ULL
+#   define ISA_MAGIC_VALUE 0x001d800000000001ULL
+    struct {
+        uintptr_t nonpointer        : 1;
+        uintptr_t has_assoc         : 1;
+        uintptr_t has_cxx_dtor      : 1;
+        uintptr_t shiftcls          : 44; // MACH_VM_MAX_ADDRESS 0x7fffffe00000
+        uintptr_t magic             : 6;
+        uintptr_t weakly_referenced : 1;
+        uintptr_t deallocating      : 1;
+        uintptr_t has_sidetable_rc  : 1;
+        uintptr_t extra_rc          : 8;
+#       define RC_ONE   (1ULL&lt;&lt;56)
+#       define RC_HALF  (1ULL&lt;&lt;7)
+    };
+
+# else
+#   error unknown architecture for packed isa
+# endif
+
+}
+</code></pre></div></div>
+
+<h3 id="3cache_t源码分析">3、cache_t源码分析</h3>
+
+<p><code class="highlighter-rouge">cache_t</code>增量扩展的哈希表结构。哈希表内部存储的 <code class="highlighter-rouge">bucket_t</code>。</p>
+
+<p><code class="highlighter-rouge">bucket_t</code> 中存储的是 <code class="highlighter-rouge">SEL</code> 和 <code class="highlighter-rouge">IMP</code>的键值对。</p>
+
+<ul>
+  <li>
+    <p>如果是有序方法列表，采用二分查找</p>
+  </li>
+  <li>
+    <p>如果是无序方法列表，直接遍历查找</p>
+  </li>
+</ul>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 缓存曾经调用过的方法，提高查找速率
+struct cache_t {
+    struct bucket_t *_buckets; // 散列表
+    mask_t _mask; //散列表的长度 - 1
+    mask_t _occupied; // 已经缓存的方法数量，散列表的长度使大于已经缓存的数量的。
+    //...
+}
+
+struct bucket_t {
+    cache_key_t _key; //SEL作为Key @selector()
+    IMP _imp; // 函数的内存地址
+    //...
+}
+</code></pre></div></div>
+
+<p>散列表查找过程，在<code class="highlighter-rouge">objc-cache.mm</code>文件中</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 查询散列表，k
+bucket_t * cache_t::find(cache_key_t k, id receiver)
+{
+    assert(k != 0); // 断言
+
+    bucket_t *b = buckets(); // 获取散列表
+    mask_t m = mask(); // 散列表长度 - 1
+    mask_t begin = cache_hash(k, m); // &amp; 操作
+    mask_t i = begin; // 索引值
+    do {
+        if (b[i].key() == 0  ||  b[i].key() == k) {
+            return &amp;b[i];
+        }
+    } while ((i = cache_next(i, m)) != begin);
+    // i 的值最大等于mask,最小等于0。
+
+    // hack
+    Class cls = (Class)((uintptr_t)this - offsetof(objc_class, cache));
+    cache_t::bad_cache(receiver, (SEL)k, cls);
+}
+</code></pre></div></div>
+
+<p>上面是查询散列表函数，其中<code class="highlighter-rouge">cache_hash(k, m)</code>是静态内联方法，将传入的<code class="highlighter-rouge">key</code>和<code class="highlighter-rouge">mask</code>进行<code class="highlighter-rouge">&amp;</code>操作返回<code class="highlighter-rouge">uint32_t</code>索引值。<code class="highlighter-rouge">do-while</code>循环查找过程，当发生冲突<code class="highlighter-rouge">cache_next</code>方法将索引值减1。</p>
+
+<h3 id="4class_rw_t-与-class_ro_t">4、class_rw_t 与 class_ro_t</h3>
+
+<p><code class="highlighter-rouge">class_rw_t</code> 、<code class="highlighter-rouge">class_ro_t</code>中的<code class="highlighter-rouge">rw</code>、<code class="highlighter-rouge">ro</code>应该是readwrite、readonly的意思。</p>
+
+<p><code class="highlighter-rouge">ObjC</code> 类中的属性、方法还有遵循的协议等信息都保存在 <code class="highlighter-rouge">class_rw_t</code> 中：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 可读可写
+struct class_rw_t {
+    // Be warned that Symbolication knows the layout of this structure.
+    uint32_t flags;
+    uint32_t version;
+
+    const class_ro_t *ro; // 指向只读的结构体,存放类初始信息
+
+    /*
+     这三个都是二维数组，是可读可写的，包含了类的初始内容、分类的内容。
+     methods中，存储 method_list_t ----&gt; method_t
+     二维数组，method_list_t --&gt; method_t
+     这三个二位数组中的数据有一部分是从class_ro_t中合并过来的。
+     */
+    method_array_t methods; // 方法列表（类对象存放对象方法，元类对象存放类方法）
+    property_array_t properties; // 属性列表
+    protocol_array_t protocols; //协议列表
+
+    Class firstSubclass;
+    Class nextSiblingClass;
+    
+    //...
+}
+</code></pre></div></div>
+
+<p><code class="highlighter-rouge">class_ro_t</code>存储了当前类在编译期就已经确定的属性、方法以及遵循的协议。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>struct class_ro_t {  
+    uint32_t flags;
+    uint32_t instanceStart;
+    uint32_t instanceSize;
+    uint32_t reserved;
+
+    const uint8_t * ivarLayout;
+
+    const char * name;
+    method_list_t * baseMethodList;
+    protocol_list_t * baseProtocols;
+    const ivar_list_t * ivars;
+
+    const uint8_t * weakIvarLayout;
+    property_list_t *baseProperties;
+};
+// baseMethodList，baseProtocols，ivars，baseProperties四个都是一维数组。
+</code></pre></div></div>
+
+<h3 id="5weak底层分析">5、weak底层分析</h3>
+
+<p>runtime 对注册的类会进行布局，对于 weak 修饰的对象会放入一个 hash 表中。 用 weak 指向的对象内存地址作为key，当此对象的引用计数为0的时候会 dealloc，假如 weak 指向的对象内存地址是a，那么就会以a为键， 在这个 weak表中搜索，找到所有以a为键的 weak 对象，从而设置为 nil。</p>
+
+<p><strong>1.初始化时：runtime会调用objc_initWeak函数，初始化一个新的weak指针指向对象的地址。</strong></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>{
+    NSObject *obj = [[NSObject alloc] init];
+    id __weak obj1 = obj;
+}
+</code></pre></div></div>
+
+<p>当我们初始化一个weak变量时，runtime会调用 <code class="highlighter-rouge">NSObject.mm</code> 中的<code class="highlighter-rouge">objc_initWeak</code>函数。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 编译器的模拟代码
+id obj1;
+objc_initWeak(&amp;obj1, obj);
+...
+
+// obj引用计数变为0，变量作用域结束
+objc_destroyWeak(&amp;obj1);
+</code></pre></div></div>
+
+<p>通过<code class="highlighter-rouge">objc_initWeak</code>函数初始化”附有weak修饰符的变量(obj1)”，在变量作用域结束时通过<code class="highlighter-rouge">objc_destoryWeak</code>函数释放该变量 (obj1)。</p>
+
+<p><strong>2.添加引用时：objc_initWeak函数会调用objc_storeWeak() 函数， objc_storeWeak()的作用是更新指针指向，创建对应的弱引用表。</strong></p>
+
+<p><code class="highlighter-rouge">objc_initWeak</code>函数将”附有weak修饰符的变量 (obj1)”初始化为0 (nil)后，会将”赋值对象” (obj) 作为参数，调用<code class="highlighter-rouge">objc_storeWeak</code>函数。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>obj1 = 0；
+obj_storeWeak(&amp;obj1, obj);
+</code></pre></div></div>
+
+<p>也就是说：weak 修饰的指针默认值是 nil （在Objective-C中向nil发送消息是安全的）</p>
+
+<p>然后<code class="highlighter-rouge">obj_destroyWeak</code>函数将0（nil）作为参数，调用<code class="highlighter-rouge">objc_storeWeak</code>函数。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>objc_storeWeak(&amp;obj1, 0);
+</code></pre></div></div>
+
+<p>前面的源代码与下列源代码相同。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 编译器的模拟代码
+id obj1;
+obj1 = 0;
+objc_storeWeak(&amp;obj1, obj);
+...
+
+// obj的引用计数变为0，被置nil 
+objc_storeWeak(&amp;obj1, 0);
+</code></pre></div></div>
+
+<p><code class="highlighter-rouge">objc_storeWeak</code>函数把第二个参数的赋值对象（obj）的内存地址作为键值，将第一个参数__weak修饰的属性变量（obj1）的内存地址注册到 weak 表中。如果第二个参数（obj）为0（nil），那么把变量（obj1）的地址从weak表中删除。</p>
+
+:ET

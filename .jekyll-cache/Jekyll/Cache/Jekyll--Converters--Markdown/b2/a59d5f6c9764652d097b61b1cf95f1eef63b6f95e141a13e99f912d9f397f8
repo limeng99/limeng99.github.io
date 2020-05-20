@@ -1,0 +1,79 @@
+I"�<p>当用户点击了App图标，到能够看到App主界面内容为止，在这个过程中应用做了那些事情呢？这些事情是否可以优化从而提高启动速度呢？下面我们将会讨论以上问题。</p>
+
+<h3 id="ios-程序-main函数之前发生什么">iOS 程序 main函数之前发生什么</h3>
+
+<p>在调用<code class="highlighter-rouge">main()</code>函数之前，基本所有工作都是由操作系统完成的，开发者能够插手的地方不多，多以如果想要想要优化这段时间，就必须了解，操作系统在<code class="highlighter-rouge">main()</code>之前做了什么。</p>
+
+<p><code class="highlighter-rouge">main()</code>之前操作系统所做的工作是把可执行文件（Mach-O格式）加载到内存空间，然后动态链接库dyld，再执行一系列动态链接操作和初始化操作的过程（加载、绑定。及初始化）。</p>
+
+<p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/main-load.png" alt="main-load" /></p>
+
+<h4 id="1exe">1、exe()</h4>
+
+<p><code class="highlighter-rouge">exec()</code>是一个系统调用</p>
+
+<h4 id="2-加载可执行文件">2、 加载可执行文件</h4>
+
+<p>加载<code class="highlighter-rouge">Mach-O</code>文件，<code class="highlighter-rouge">Mach-O</code>文件格式是<code class="highlighter-rouge">OS X</code>与<code class="highlighter-rouge">iOS</code>系统上的可执行文件格式，像我们编译过程产生的<code class="highlighter-rouge">.O</code>文件，以及程序的可执行文件，动态库等都是<code class="highlighter-rouge">Mach-O</code>文件。</p>
+
+<h4 id="3加载dyld">3、加载Dyld</h4>
+
+<p><code class="highlighter-rouge">dyld(the dynamic link editor)</code>, <code class="highlighter-rouge">Apple</code> 的动态链接器。系统加载程序可执行文件后，通过分析文件来获得<code class="highlighter-rouge">dyld</code>所在路径来加载<code class="highlighter-rouge">dyld</code>，然后就将后面的事情交给<code class="highlighter-rouge">dyld</code>。</p>
+
+<h4 id="4加载动态库">4、加载动态库</h4>
+
+<p><code class="highlighter-rouge">dyld</code>从主执行文件的header获取到需要加载的所依赖动态库列表，然后它需要找到每个 <code class="highlighter-rouge">dylib</code>，而应用所依赖的 <code class="highlighter-rouge">dylib</code> 文件可能会再依赖其他 <code class="highlighter-rouge">dylib</code>，所以所需要加载的是动态库列表一个递归依赖的集合，当然这里有<strong>缓存机制</strong>。</p>
+
+<h4 id="5rebase和bind">5、Rebase和Bind</h4>
+
+<p>了解完<code class="highlighter-rouge">main()</code>之前的加载过程后，我们可以分析出影响<code class="highlighter-rouge">main</code>调用前启动时间的因素：</p>
+
+<ol>
+  <li>
+    <p>动态库加载越多，启动越慢</p>
+  </li>
+  <li>
+    <p><code class="highlighter-rouge">Objc</code>类，方法越多，启动越慢</p>
+  </li>
+  <li>
+    <p><code class="highlighter-rouge">Objc</code>的<code class="highlighter-rouge">+load()</code>越多，启动越慢</p>
+  </li>
+  <li>
+    <p><code class="highlighter-rouge">C</code>的<code class="highlighter-rouge">constructor</code>函数越多，启动越慢</p>
+  </li>
+  <li>
+    <p><code class="highlighter-rouge">C++</code>静态对象越多，启动越慢</p>
+  </li>
+</ol>
+
+<h4 id="main加载前启动优化">main()加载前启动优化：</h4>
+
+<ol>
+  <li>减少依赖不必要的库，不管是动态库还是静态库；如果可以的话，把动态库改造成静态库； 如果必须依赖动态库，则把多个非系统的动态库合并成一个动态库；</li>
+  <li>检查下 <code class="highlighter-rouge">framework</code>应当设为<code class="highlighter-rouge">optional</code>和<code class="highlighter-rouge">required</code>， 如果该<code class="highlighter-rouge">framework</code>在当前App支持的所有<code class="highlighter-rouge">iOS</code>系统版本都存在，那么就设为<code class="highlighter-rouge">required</code>，否则就设为<code class="highlighter-rouge">optional</code>， 因为<code class="highlighter-rouge">optional</code>会有些额外的检查；</li>
+  <li>合并或者删减一些<code class="highlighter-rouge">OC</code>类和函数；</li>
+  <li>删减一些无用的静态变量；</li>
+  <li>删减没有被调用到或者已经废弃的方法；</li>
+  <li>将不必须在<code class="highlighter-rouge">+load</code>方法中做的事情延迟到<code class="highlighter-rouge">+initialize</code>中，尽量不要用<code class="highlighter-rouge">C++</code>虚函数(创建虚函数表有开销) ；</li>
+  <li>类和方法名不要太长：<code class="highlighter-rouge">iOS</code>每个类和方法名都在<code class="highlighter-rouge">__cstring</code>段里都存了相应的字符串值，所以类和方法名的长短也是对可执行文件大小是有影响的； 因还是<code class="highlighter-rouge">Objective-C</code>的动态特性，因为需要通过类/方法名反射找到这个类/方法进行调用，<code class="highlighter-rouge">Objective-C</code>对象模型会把类/方法名字符串都保存下来；</li>
+  <li><code class="highlighter-rouge">dispatch_once()</code>代替所有的 <code class="highlighter-rouge">attribute((constructor))</code> 函数、<code class="highlighter-rouge">C++</code>静态对象初始化、<code class="highlighter-rouge">Objc</code>的<code class="highlighter-rouge">+load</code>函数；</li>
+  <li>对图片进行可接受范围内的压缩；</li>
+</ol>
+
+<h3 id="main之后">main()之后</h3>
+
+<p><code class="highlighter-rouge">main()</code>函数之后，即从<code class="highlighter-rouge">main()</code>开始，到<code class="highlighter-rouge">AppDelegate</code>的<code class="highlighter-rouge">didFinishLaunchingWithOptions</code>方法执行完毕，至App初始化完成，首页请求、首页渲染等过程后，用户看到界面为止。</p>
+
+<p><code class="highlighter-rouge">main()</code>加载后启动优化：</p>
+
+<ol>
+  <li>减少启动初始化的流程，能懒加载的就懒加载，能放后台初始化的就放后台， 能够延时初始化的就延时，不要卡主线程的启动时间，已经下线的业务直接删掉；</li>
+  <li>优化代码逻辑，去除一些非必要的逻辑和代码，减少每个流程所消耗的时间；</li>
+  <li>启动阶段使用多线程来进行初始化，把<code class="highlighter-rouge">CPU</code>的性能尽量发挥出来；</li>
+  <li>使用纯代码而不是<code class="highlighter-rouge">xib</code>或者<code class="highlighter-rouge">storyboard</code>来进行<code class="highlighter-rouge">UI</code>框架的搭建，尤其是主<code class="highlighter-rouge">UI</code>框架比如<code class="highlighter-rouge">TabBarController</code>这种， 尽量避免使用<code class="highlighter-rouge">xib</code>和<code class="highlighter-rouge">storyboard</code>，因为<code class="highlighter-rouge">xib</code>和<code class="highlighter-rouge">storyboard</code>也还是要解析成代码来渲染页面，多了一些步骤；</li>
+</ol>
+
+<h3 id="参考链接">参考链接</h3>
+
+<p><a href="https://tech.meituan.com/2018/12/06/waimai-ios-optimizing-startup.html">美团外卖iOS App冷启动治理</a></p>
+:ET

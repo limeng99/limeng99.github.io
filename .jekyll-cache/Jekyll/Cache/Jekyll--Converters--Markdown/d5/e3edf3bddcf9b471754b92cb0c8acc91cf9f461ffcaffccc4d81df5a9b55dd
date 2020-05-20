@@ -1,0 +1,12 @@
+I"J
+<ul>
+  <li><a href="#main之前">main()之前</a>
+    <ul>
+      <li><a href="#1加载dyld">1、加载Dyld</a></li>
+      <li><a href="#main加载前启动优化">main()加载前启动优化：</a></li>
+    </ul>
+  </li>
+  <li><a href="#main之后">main()之后</a></li>
+  <li><a href="#参考链接">参考链接</a></li>
+</ul>
+:ET

@@ -1,0 +1,5 @@
+I"j<h3 id="1一个nsobject占用多少内存">1、一个NSObject占用多少内存？</h3>
+
+<p>受限于内存分配的机制，一个 <code class="highlighter-rouge">NSObject</code>对象都会分配 <code class="highlighter-rouge">16byte</code> 的内存空间。但是实际上在 32位系统上，只使用了 <code class="highlighter-rouge">8byte</code>;</p>
+
+:ET
