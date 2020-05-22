@@ -1,0 +1,481 @@
+I"0}<p>本人也看着众大神的文章才对runloop有了一定的了解，希望通过这篇文章来记录并加深对runloop的理解。<a href="https://opensource.apple.com/tarballs/CF/">CFRunloop源代码</a></p>
+
+<h3 id="一runloop简介">一、RunLoop简介</h3>
+
+<p>RunLoop 实际上就是一个对象，这个对象管理了其需要处理的事件和消息，并提供了一个入口函数来执行上面 Event Loop 的逻辑。线程执行了这个函数后，就会一直处于这个函数内部 “接受消息-&gt;等待-&gt;处理” 的循环中，直到这个循环结束（比如传入 quit 的消息），函数返回。</p>
+
+<p>OSX/iOS 系统中，提供了两个这样的对象：<code class="highlighter-rouge">NSRunLoop</code> 和 <code class="highlighter-rouge">CFRunLoopRef</code>。</p>
+
+<ul>
+  <li><code class="highlighter-rouge">CFRunLoopRef</code> 是在 <code class="highlighter-rouge">CoreFoundation</code> 框架内的，它提供了纯 C 函数的 API，所有这些 API 都是线程安全的。</li>
+  <li><code class="highlighter-rouge">NSRunLoop</code> 是基于 <code class="highlighter-rouge">CFRunLoopRef</code> 的封装，提供了面向对象的 API，但是这些 API 不是线程安全的。</li>
+</ul>
+
+<h3 id="二runloop与线程关系">二、RunLoop与线程关系</h3>
+
+<p>RunLoop 和线程是息息相关的，我们知道线程的作用是用来执行特定的一个或多个任务，在默认情况下，线程执行完之后就会退出，就不能再执行任务了。这时我们就需要采用一种方式来让线程能够不断地处理任务，并不退出。所以，我们就有了 RunLoop。</p>
+
+<p>苹果不允许直接创建 RunLoop，它只提供了两个自动获取的函数：<code class="highlighter-rouge">CFRunLoopGetMain()</code> 和 <code class="highlighter-rouge">CFRunLoopGetCurrent()</code>。 这两个函数源码为下面这样:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 全局的Dictionary，key 是 pthread_t， value 是 CFRunLoopRef
+static CFMutableDictionaryRef __CFRunLoops = NULL;
+// 访问 __CFRunLoops 时的锁
+static CFSpinLock_t loopsLock = CFSpinLockInit;
+
+CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
+    if (pthread_equal(t, kNilPthreadT)) {
+	t = pthread_main_thread_np();
+    }
+    __CFSpinLock(&amp;loopsLock);
+    if (!__CFRunLoops) {
+    	// 第一次进入时，初始化全局 __CFRunLoops，并先为主线程创建一个 RunLoop
+        __CFSpinUnlock(&amp;loopsLock);
+	CFMutableDictionaryRef dict = CFDictionaryCreateMutable(kCFAllocatorSystemDefault, 0, NULL, &amp;kCFTypeDictionaryValueCallBacks);
+	CFRunLoopRef mainLoop = __CFRunLoopCreate(pthread_main_thread_np());
+	CFDictionarySetValue(dict, pthreadPointer(pthread_main_thread_np()), mainLoop);
+ 	if (!OSAtomicCompareAndSwapPtrBarrier(NULL, dict, (void * volatile *)&amp;__CFRunLoops)) {
+            CFRelease(dict);
+        }
+	CFRelease(mainLoop);
+   	__CFSpinLock(&amp;loopsLock);
+    }
+    // 直接从 __CFRunLoops 里获取
+    CFRunLoopRef loop = (CFRunLoopRef)CFDictionaryGetValue(__CFRunLoops, pthreadPointer(t));
+    __CFSpinUnlock(&amp;loopsLock);
+    if (!loop) {
+    	// 获取不到时，创建一个
+	CFRunLoopRef newLoop = __CFRunLoopCreate(t);
+  __CFSpinLock(&amp;loopsLock);
+  loop = (CFRunLoopRef)CFDictionaryGetValue(__CFRunLoops, pthreadPointer(t));
+  if (!loop) {
+  CFDictionarySetValue(__CFRunLoops, pthreadPointer(t), newLoop);
+  loop = newLoop;
+  }
+  __CFSpinUnlock(&amp;loopsLock);
+  CFRelease(newLoop);
+    }
+    if (pthread_equal(t, pthread_self())) {
+    		// 注册一个回调，当线程销毁时，顺便也销毁其对应的 RunLoop。
+       	_CFSetTSD(__CFTSDKeyRunLoop, (void *)loop, NULL);
+        if (0 == _CFGetTSD(__CFTSDKeyRunLoopCntr)) {
+            _CFSetTSD(__CFTSDKeyRunLoopCntr, (void *)(PTHREAD_DESTRUCTOR_ITERATIONS-1), (void (* (void *))__CFFinalizeRunLoop);
+        }
+    }
+    return loop;
+}
+
+CFRunLoopRef CFRunLoopGetMain(void) {
+    CHECK_FOR_FORK();
+    static CFRunLoopRef __main = NULL; // no retain needed
+    // pthread_main_thread_np() 为主线程
+    if (!__main) __main = _CFRunLoopGet0(pthread_main_thread_np()); // no CAS needed
+    return __main;
+}
+
+CFRunLoopRef CFRunLoopGetCurrent(void) {
+    CHECK_FOR_FORK();
+    CFRunLoopRef rl = (CFRunLoopRef)_CFGetTSD(__CFTSDKeyRunLoop);
+    if (rl) return rl;
+    // pthread_self() 为当前线程
+    return _CFRunLoopGet0(pthread_self());
+}
+
+void CFRunLoopRun(void) {	/* DOES CALLOUT */
+    int32_t result;
+    do {
+        result = CFRunLoopRunSpecific(CFRunLoopGetCurrent(), kCFRunLoopDefaultMode, 1.0e10, false);
+        CHECK_FOR_FORK();
+    } while (kCFRunLoopRunStopped != result &amp;&amp; kCFRunLoopRunFinished != result);
+}
+</code></pre></div></div>
+
+<p>从上面的代码可以看出，线程和 RunLoop 之间是一一对应的，其关系是保存在一个全局的 Dictionary 里。线程刚创建时并没有 RunLoop，如果你不主动获取，那它一直都不会有。RunLoop 的创建是发生在第一次获取时，RunLoop 的销毁是发生在线程结束时。你只能在一个线程的内部获取其 RunLoop（主线程除外）。</p>
+
+<p>RunLoop与线程之间的关系密不可分:</p>
+
+<ul>
+  <li>线程与RunLoop是一一对应的，一个线程对应一个RunLoop对象，RunLoop不能自己创建。</li>
+  <li>主线程的RunLoop在应用启动的时候会自动创建，非主线程的RunLoop需要在该线程自己启动。</li>
+  <li>RunLoop对象在第一次获取RunLoop时创建，销毁则是在线程结束的时候。</li>
+  <li>RunLoop并不是线程安全的，只能在当前线程中操作当前线程的RunLoop，而不能去操作其他线程的RunLoop，同时也需要避免在其他线程上调用当前线程的RunLoop。</li>
+</ul>
+
+<h3 id="三runloop相关类">三、RunLoop相关类</h3>
+
+<p>在 <code class="highlighter-rouge">CoreFoundation</code> 里面关于 RunLoop 有5个类:</p>
+
+<ol>
+  <li><code class="highlighter-rouge">CFRunLoopRef</code>：代表 RunLoop 的对象</li>
+  <li><code class="highlighter-rouge">CFRunLoopModeRef</code>：代表 RunLoop 的运行模式</li>
+  <li><code class="highlighter-rouge">CFRunLoopSourceRef</code>：就是 RunLoop 模型图中提到的输入源 / 事件源</li>
+  <li><code class="highlighter-rouge">CFRunLoopTimerRef</code>：就是 RunLoop 模型图中提到的定时源</li>
+  <li><code class="highlighter-rouge">CFRunLoopObserverRef</code>：观察者，能够监听 RunLoop 的状态改变</li>
+</ol>
+
+<p>其中 <code class="highlighter-rouge">CFRunLoopModeRef</code> 类并没有对外暴露，只是通过 <code class="highlighter-rouge">CFRunLoopRef </code>的接口进行了封装。他们的关系如下:</p>
+
+<p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/runloop-class.png" alt="runloop-class" /></p>
+
+<p>一个RunLoop对象<code class="highlighter-rouge">CFRunLoopRef</code>中包含若干个运行模式<code class="highlighter-rouge">CFRunLoopModeRef</code>。而每一个运行模式下又包含若干个输入源<code class="highlighter-rouge">CFRunLoopSourceRef</code>、定时源<code class="highlighter-rouge">CFRunLoopTimerRef</code>、观察者<code class="highlighter-rouge">CFRunLoopObserverRef</code>。</p>
+
+<ul>
+  <li>
+    <p>每次 RunLoop 启动时，只能指定其中一个运行模式<code class="highlighter-rouge">CFRunLoopModeRef</code>，这个运行模式<code class="highlighter-rouge">CFRunLoopModeRef</code>被称作当前运行模式<code class="highlighter-rouge">CurrentMode</code>。</p>
+  </li>
+  <li>
+    <p>如果需要切换运行模式<code class="highlighter-rouge">CFRunLoopModeRef</code>，只能退出当前 RunLoop，再重新指定一个运行模式<code class="highlighter-rouge">CFRunLoopModeRef</code>进入。</p>
+  </li>
+  <li>
+    <p>主要是为了分隔开不同组的输入源<code class="highlighter-rouge">CFRunLoopSourceRef</code>、定时源<code class="highlighter-rouge">CFRunLoopTimerRef</code>、观察者<code class="highlighter-rouge">CFRunLoopObserverRef</code>，让其互不影响。</p>
+  </li>
+</ul>
+
+<h4 id="31-cfrunloopref">3.1 CFRunLoopRef</h4>
+
+<p><code class="highlighter-rouge">CFRunLoopRef</code> 是 <code class="highlighter-rouge">Core Foundation</code> 框架下 RunLoop 对象类。我们可通过以下方式来获取 RunLoop 对象：</p>
+
+<p>Core Foundation 框架下:</p>
+
+<ul>
+  <li><code class="highlighter-rouge">CFRunLoopGetCurrent();</code> // 获得当前线程的 RunLoop 对象</li>
+  <li><code class="highlighter-rouge">CFRunLoopGetMain(); </code> // 获得主线程的 RunLoop 对象</li>
+</ul>
+
+<p>在Foundation框架下</p>
+
+<ul>
+  <li><code class="highlighter-rouge">[NSRunLoop currentRunLoop];</code> // 获得当前线程的 RunLoop 对象</li>
+  <li><code class="highlighter-rouge">[NSRunLoop mainRunLoop];</code> // 获得主线程的 RunLoop 对象</li>
+</ul>
+
+<p><code class="highlighter-rouge">CFRunLoopRef</code>源码：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>struct __CFRunLoop {
+    ...
+    CFMutableSetRef _commonModes; 			// Set 集合
+    CFMutableSetRef _commonModeItems;   // Set&lt;Source/Observer/Timer&gt; 集合 
+    CFRunLoopModeRef _currentMode;			// Current Runloop Mode
+    CFMutableSetRef _modes;							// Set 集合
+    ...
+};
+</code></pre></div></div>
+
+<h4 id="32-cfrunloopmoderef">3.2 CFRunLoopModeRef</h4>
+
+<p>系统默认定义了多种运行模式<code class="highlighter-rouge">CFRunLoopModeRef</code>，如下：</p>
+
+<ol>
+  <li><strong><code class="highlighter-rouge">kCFRunLoopDefaultMode</code></strong>：App的默认运行模式，通常主线程是在这个运行模式下运行</li>
+  <li><strong><code class="highlighter-rouge">UITrackingRunLoopMode</code></strong>：跟踪用户交互事件（用于 ScrollView 追踪触摸滑动，保证界面滑动时不受其他Mode影响）</li>
+  <li><code class="highlighter-rouge">UIInitializationRunLoopMode</code>：在刚启动App时第进入的第一个 Mode，启动完成后就不再使用</li>
+  <li><code class="highlighter-rouge">GSEventReceiveRunLoopMode</code>：接受系统内部事件，通常用不到</li>
+  <li><strong><code class="highlighter-rouge">kCFRunLoopCommonModes</code></strong>：伪模式，不是一种真正的运行模式（后边会用到）</li>
+</ol>
+
+<p>其中<strong><code class="highlighter-rouge">kCFRunLoopDefaultMode</code></strong>、<strong><code class="highlighter-rouge">UITrackingRunLoopMode</code></strong>、<strong><code class="highlighter-rouge">kCFRunLoopCommonModes</code></strong>是我们开发中需要用到的模式。</p>
+
+<p><code class="highlighter-rouge">CFRunLoopModeRef</code>源码如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>struct __CFRunLoopMode {
+    ...
+    CFStringRef _name;  							// Mode Name, 例如 @"kCFRunLoopDefaultMode"
+    CFMutableSetRef _sources0;				// Set 集合
+    CFMutableSetRef _sources1;				// Set 集合
+    CFMutableArrayRef _observers;     // Array 数组
+    CFMutableArrayRef _timers;				// Array 数组
+    CFMutableDictionaryRef _portToV1SourceMap;
+    __CFPortSet _portSet;
+    CFIndex _observerMask;
+		....
+    uint64_t _timerSoftDeadline; /* TSR */
+    uint64_t _timerHardDeadline; /* TSR */
+};
+</code></pre></div></div>
+
+<p>一个 RunLoop 对象包含若干个 Mode 对象，每个 Mode 又包含若干个 Source/Timer/Observer，RunLoop 一次运行只能在一个 Mode 之下，如果需要切换 Mode，需要退出 RunLoop 才能重新指定一个 Mode。这样做主要是为了分隔开不同组Source/Timer/Observer，让其互不影响。</p>
+
+<h4 id="33-cfrunlooptimerref">3.3 CFRunLoopTimerRef</h4>
+
+<p><code class="highlighter-rouge">CFRunLoopTimerRef</code>是定时源（RunLoop模型图中提到过），理解为基于时间的触发器，基本上就是<code class="highlighter-rouge">NSTimer</code>。</p>
+
+<p>一个比较常见的问题：滑动tableView时，定时器还会生效吗？</p>
+
+<p>默认情况下RunLoop运行在<code class="highlighter-rouge">kCFRunLoopDefaultMode</code>下，而当滑动tableView时，RunLoop切换到<code class="highlighter-rouge">UITrackingRunLoopMode</code>，而Timer是在<code class="highlighter-rouge">kCFRunLoopDefaultMode</code>下的，就无法接受处理Timer的事件。</p>
+
+<p>怎么去解决这个问题呢？把Timer添加到UITrackingRunLoopMode上并不能解决问题，因为这样在默认情况下就无法接受定时器事件了。 所以我们需要把Timer同时添加到<code class="highlighter-rouge">UITrackingRunLoopMode</code>和<code class="highlighter-rouge">kCFRunLoopDefaultMode</code>上。
+ 那么如何把timer同时添加到多个mode上呢？就要用到<code class="highlighter-rouge">NSRunLoopCommonModes</code>了。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[[NSRunLoop currentRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+</code></pre></div></div>
+
+<p>Timer就被添加到多个mode上，这样即使RunLoop由<code class="highlighter-rouge">kCFRunLoopDefaultMode</code>切换到<code class="highlighter-rouge">UITrackingRunLoopMode</code>下，也不会影响接收Timer事件。</p>
+
+<h4 id="34-cfrunloopsourceref">3.4 CFRunLoopSourceRef</h4>
+
+<p><code class="highlighter-rouge">CFRunLoopSourceRef</code> 是事件产生的地方。Source有两个版本：Source0 和 Source1</p>
+
+<ul>
+  <li>Source0 只包含了一个回调（函数指针），它并不能主动触发事件。使用时，你需要先调用 <code class="highlighter-rouge">CFRunLoopSourceSignal(source)</code>，将这个 Source 标记为待处理，然后手动调用 <code class="highlighter-rouge">CFRunLoopWakeUp(runloop) </code>来唤醒 RunLoop，让其处理这个事件。</li>
+  <li>Source1 包含了一个 mach_port 和一个回调（函数指针），被用于通过内核和其他线程相互发送消息。这种 Source 能主动唤醒 RunLoop 的线程，其原理在下面会讲到。</li>
+</ul>
+
+<h4 id="35-cfrunloopobserverref">3.5 CFRunLoopObserverRef</h4>
+
+<p><code class="highlighter-rouge">CFRunLoopObserverRef</code>是观察者，用来监听RunLoop的状态改变。</p>
+
+<p><code class="highlighter-rouge">CFRunLoopObserverRef</code>可以监听的状态改变有以下几种：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity) {
+    kCFRunLoopEntry = (1UL &lt;&lt; 0),               // 即将进入RunLoop：1
+    kCFRunLoopBeforeTimers = (1UL &lt;&lt; 1),        // 即将处理Timer：2    
+    kCFRunLoopBeforeSources = (1UL &lt;&lt; 2),       // 即将处理Source：4
+    kCFRunLoopBeforeWaiting = (1UL &lt;&lt; 5),       // 即将进入休眠：32
+    kCFRunLoopAfterWaiting = (1UL &lt;&lt; 6),        // 即将从休眠中唤醒：64
+    kCFRunLoopExit = (1UL &lt;&lt; 7),                // 即将从Loop中退出：128
+    kCFRunLoopAllActivities = 0x0FFFFFFFU       // 监听全部状态改变  
+};
+</code></pre></div></div>
+
+<h3 id="四runloop原理">四、RunLoop原理</h3>
+
+<p>根据苹果在<a href="https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/Multithreading/RunLoopManagement/RunLoopManagement.html#//apple_ref/doc/uid/10000057i-CH16-SW23">文档</a>里的说明，RunLoop 内部的逻辑大致如下:</p>
+
+<p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/runloop-chart.png" alt="runloop-chart" /></p>
+
+<p>其内部源码整理如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 用DefaultMode启动
+void CFRunLoopRun(void) {	/* DOES CALLOUT */
+    int32_t result;
+    do {
+        result = CFRunLoopRunSpecific(CFRunLoopGetCurrent(), kCFRunLoopDefaultMode, 1.0e10, false);
+        CHECK_FOR_FORK();
+    } while (kCFRunLoopRunStopped != result &amp;&amp; kCFRunLoopRunFinished != result);
+}
+
+
+// 用指定的Mode启动，允许设置RunLoop超时时间
+SInt32 CFRunLoopRunInMode(CFStringRef modeName, CFTimeInterval seconds, Boolean returnAfterSourceHandled) {     /* DOES CALLOUT */
+    CHECK_FOR_FORK();
+    return CFRunLoopRunSpecific(CFRunLoopGetCurrent(), modeName, seconds, returnAfterSourceHandled);
+}
+
+
+// RunLoop的实现
+SInt32 CFRunLoopRunSpecific(CFRunLoopRef rl, CFStringRef modeName, CFTimeInterval seconds, Boolean returnAfterSourceHandled) {     /* DOES CALLOUT */
+    CHECK_FOR_FORK();
+    if (__CFRunLoopIsDeallocating(rl)) return kCFRunLoopRunFinished;
+    __CFRunLoopLock(rl);
+    // 首先根据modeName找到对应mode
+    CFRunLoopModeRef currentMode = __CFRunLoopFindMode(rl, modeName, false);
+    if (NULL == currentMode || __CFRunLoopModeIsEmpty(rl, currentMode, rl-&gt;_currentMode)) {
+				Boolean did = false;
+				if (currentMode) __CFRunLoopModeUnlock(currentMode);
+				__CFRunLoopUnlock(rl);
+				return did ? kCFRunLoopRunHandledSource : kCFRunLoopRunFinished;
+    }
+    volatile _per_run_data *previousPerRun = __CFRunLoopPushPerRunData(rl);
+    CFRunLoopModeRef previousMode = rl-&gt;_currentMode;
+    rl-&gt;_currentMode = currentMode;
+    int32_t result = kCFRunLoopRunFinished;
+    
+		// 1. 通知 Observers: RunLoop 即将进入。
+		if (currentMode-&gt;_observerMask &amp; kCFRunLoopEntry ) __CFRunLoopDoObservers(rl, currentMode, kCFRunLoopEntry);
+		// 内部函数 __CFRunLoopRun
+		result = __CFRunLoopRun(rl, currentMode, seconds, returnAfterSourceHandled, previousMode);
+		// 10. 通知 Observers: RunLoop 即将退出。
+		if (currentMode-&gt;_observerMask &amp; kCFRunLoopExit ) __CFRunLoopDoObservers(rl, currentMode, kCFRunLoopExit);
+  	__CFRunLoopModeUnlock(currentMode);
+    __CFRunLoopPopPerRunData(rl, previousPerRun);
+		rl-&gt;_currentMode = previousMode;
+    __CFRunLoopUnlock(rl);
+    return result;
+}
+
+
+// 内部函数 __CFRunLoopRun
+static int32_t __CFRunLoopRun(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFTimeInterval seconds, Boolean stopAfterHandle, CFRunLoopModeRef previousMode) {
+		... 
+    Boolean didDispatchPortLastTime = true;
+    int32_t retVal = 0;
+    // 内部是一个while循环
+    do {  
+				...
+				// 2. 通知 Observers: RunLoop 即将触发 Timer 回调。
+        if (rlm-&gt;_observerMask &amp; kCFRunLoopBeforeTimers) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopBeforeTimers);
+        // 3. 通知 Observers: RunLoop 即将触发 Source0 (非port) 回调。
+        if (rlm-&gt;_observerMask &amp; kCFRunLoopBeforeSources) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopBeforeSources);
+				// 执行被加入的block
+				__CFRunLoopDoBlocks(rl, rlm);
+				// 4. RunLoop 触发 Source0 (非port) 回调。
+        Boolean sourceHandledThisLoop = __CFRunLoopDoSources0(rl, rlm, stopAfterHandle);
+        if (sourceHandledThisLoop) {
+            __CFRunLoopDoBlocks(rl, rlm);
+				}
+				// 5. 如果有 Source1 (基于port) 处于 ready 状态，直接处理这个 Source1 然后跳转去处理消息。
+				if (MACH_PORT_NULL != dispatchPort &amp;&amp; !didDispatchPortLastTime) {
+            msg = (mach_msg_header_t *)msg_buffer;
+            if (__CFRunLoopServiceMachPort(dispatchPort, &amp;msg, sizeof(msg_buffer), &amp;livePort, 0)) {
+                goto handle_msg;
+            }
+        }
+				...
+				//  6. 通知 Observers: RunLoop 的线程即将进入休眠(sleep)。
+				if (!poll &amp;&amp; (rlm-&gt;_observerMask &amp; kCFRunLoopBeforeWaiting)) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopBeforeWaiting);
+				__CFRunLoopSetSleeping(rl);
+				...
+        // 7. 调用 mach_msg 等待接受 mach_port 的消息。线程将进入休眠, 直到被下面某一个事件唤醒
+        // 7.1 一个基于 port 的Source 的事件
+        // 7.2 一个 Timer 到时间了
+        // 7.3 RunLoop 自身的超时时间到了
+        // 7.4 被其他什么调用者手动唤醒
+        msg = (mach_msg_header_t *)msg_buffer;
+        __CFRunLoopServiceMachPort(waitSet, &amp;msg, sizeof(msg_buffer), &amp;livePort, poll ? 0 : TIMEOUT_INFINITY);
+        ... 
+        // 8. 通知 Observers: RunLoop 的线程刚刚被唤醒了
+				if (!poll &amp;&amp; (rlm-&gt;_observerMask &amp; kCFRunLoopAfterWaiting)) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopAfterWaiting);
+				...
+				// 9. 收到消息，处理消息。
+        if (!__CFRunLoopDoTimers(rl, rlm, mach_absolute_time())) {
+        		// 9.1 如果一个 Timer 到时间了，触发这个Timer的回调
+       		 	__CFArmNextTimerInMode(rlm, rl);
+       		 	
+        } else if (livePort == dispatchPort) {
+        		// 9.2 如果有dispatch到main_queue的block，执行block
+            _CFSetTSD(__CFTSDKeyIsInGCDMainQ, (void *)6, NULL);
+            _CFSetTSD(__CFTSDKeyIsInGCDMainQ, (void *)0, NULL);
+
+        } else {
+        		// 9.3 处理Source1 (基于port)
+						sourceHandledThisLoop = __CFRunLoopDoSource1(rl, rlm, rls, msg, msg-&gt;msgh_size, &amp;reply) || sourceHandledThisLoop;
+        } 
+
+      if (sourceHandledThisLoop &amp;&amp; stopAfterHandle) {
+      		// 进入loop时参数说处理完事件就返回
+          retVal = kCFRunLoopRunHandledSource;
+       } else if (timeout_context-&gt;termTSR &lt; mach_absolute_time()) {
+      	 	// 超出传入参数标记的超时时间了
+           retVal = kCFRunLoopRunTimedOut;
+      } else if (__CFRunLoopIsStopped(rl)) {
+          // 被外部调用者强制停止了
+          __CFRunLoopUnsetStopped(rl);
+          retVal = kCFRunLoopRunStopped;
+      } else if (__CFRunLoopModeIsEmpty(rl, rlm, previousMode)) {
+          // source/timer/observer一个都没有了
+          retVal = kCFRunLoopRunFinished;
+      }
+   	} while (0 == retVal);
+   	...
+    return retVal;
+}
+</code></pre></div></div>
+
+<p>可以看到，实际上 RunLoop 就是这样一个函数，其内部是一个 do-while 循环。当你调用 <code class="highlighter-rouge">CFRunLoopRun() </code>时，线程就会一直停留在这个循环里；直到超时或被手动停止，该函数才会返回。</p>
+
+<p>具体的顺序如下：</p>
+
+<ol>
+  <li>通知观察者RunLoop已经启动</li>
+  <li>通知观察者即将要开始的定时器</li>
+  <li>通知观察者任何即将启动的非基于端口的源</li>
+  <li>启动任何准备好的非基于端口的源</li>
+  <li>如果基于端口的源准备好并处于等待状态，立即启动；并进入步骤9</li>
+  <li>通知观察者线程进入休眠状态</li>
+  <li>将线程置于休眠知道任一下面的事件发生：
+    <ul>
+      <li>某一事件到达基于端口的源</li>
+      <li>定时器启动</li>
+      <li>RunLoop设置的时间已经超时</li>
+      <li>RunLoop被显示唤醒</li>
+    </ul>
+  </li>
+  <li>通知观察者线程将被唤醒</li>
+  <li>处理未处理的事件
+    <ul>
+      <li>如果用户定义的定时器启动，处理定时器事件并重启RunLoop。进入步骤2</li>
+      <li>如果输入源启动，传递相应的消息</li>
+      <li>如果RunLoop被显示唤醒而且时间还没超时，重启RunLoop。进入步骤2</li>
+    </ul>
+  </li>
+  <li>通知观察者RunLoop结束。</li>
+</ol>
+
+<h3 id="五runloop-实际应用">五、RunLoop 实际应用</h3>
+
+<h4 id="51-nstimer的使用">5.1 NSTimer的使用</h4>
+
+<p>NSTimer的使用方法在讲解<code class="highlighter-rouge">CFRunLoopTimerRef</code>类的时候详细讲解过，具体参考上边 <strong>3.3 CFRunLoopTimerRef</strong>。</p>
+
+<h4 id="52-autoreleasepool释放">5.2 AutoreleasePool释放</h4>
+
+<p><code class="highlighter-rouge">App</code>启动后，苹果在主线程 <code class="highlighter-rouge">RunLoop</code> 里注册了两个 <code class="highlighter-rouge">Observer</code>，其回调都是 <code class="highlighter-rouge">_wrapRunLoopWithAutoreleasePoolHandler()</code>。</p>
+
+<p>第一个 <code class="highlighter-rouge">Observer</code> 监视的事件是 <code class="highlighter-rouge">Entry(即将进入Loop)</code>，其回调内会调用 <code class="highlighter-rouge">_objc_autoreleasePoolPush()</code> 创建自动释放池。其 <code class="highlighter-rouge">order</code> 是 <code class="highlighter-rouge">-2147483647</code>，优先级最高，保证创建释放池发生在其他所有回调之前。</p>
+
+<p>第二个 <code class="highlighter-rouge">Observer</code> 监视了两个事件： <code class="highlighter-rouge">BeforeWaiting</code>(准备进入休眠) 时调用<code class="highlighter-rouge">_objc_autoreleasePoolPop()</code>  和 <code class="highlighter-rouge">_objc_autoreleasePoolPush()</code> 释放旧的池并创建新池；<code class="highlighter-rouge">Exit</code>(即将退出Loop) 时调用 <code class="highlighter-rouge">_objc_autoreleasePoolPop()</code> 来释放自动释放池。这个 <code class="highlighter-rouge">Observer</code> 的 <code class="highlighter-rouge">order</code> 是 <code class="highlighter-rouge">2147483647</code>，优先级最低，保证其释放池子发生在其他所有回调之后。</p>
+
+<p>在主线程执行的代码，通常是写在诸如事件回调、<code class="highlighter-rouge">Timer</code>回调内的。这些回调会被 <code class="highlighter-rouge">RunLoop</code> 创建好的 <code class="highlighter-rouge">AutoreleasePool</code> 环绕着，所以不会出现内存泄漏，开发者也不必显示创建 <code class="highlighter-rouge">Pool</code> 了。</p>
+
+<h4 id="53-事件响应">5.3 事件响应</h4>
+
+<p>苹果注册了一个 <code class="highlighter-rouge">Source1</code> (基于 mach port 的) 用来接收系统事件，其回调函数为 <code class="highlighter-rouge">__IOHIDEventSystemClientQueueCallback()</code>。</p>
+
+<p>当一个硬件事件(触摸/锁屏/摇晃等)发生后，首先由<code class="highlighter-rouge"> IOKit.framework</code> 生成一个 <code class="highlighter-rouge">IOHIDEvent </code>事件并由 <code class="highlighter-rouge">SpringBoard</code> 接收。这个过程的详细情况可以参考<a href="http://iphonedevwiki.net/index.php/IOHIDFamily">这里</a>。<code class="highlighter-rouge">SpringBoard </code>只接收按键(锁屏/静音等)，触摸，加速，接近传感器等几种 Event，随后用 mach port 转发给需要的App进程。随后苹果注册的那个 Source1 就会触发回调，并调用 <code class="highlighter-rouge">_UIApplicationHandleEventQueue()</code> 进行应用内部的分发。</p>
+
+<p><code class="highlighter-rouge">_UIApplicationHandleEventQueue() </code>会把<code class="highlighter-rouge"> IOHIDEvent</code> 处理并包装成 <code class="highlighter-rouge">UIEvent</code> 进行处理或分发，其中包括识别 <code class="highlighter-rouge">UIGesture</code>/处理屏幕旋转/发送给 <code class="highlighter-rouge">UIWindow</code>等。通常事件比如 <code class="highlighter-rouge">UIButton</code> 点击、<code class="highlighter-rouge">touchesBegin/Move/End/Cancel</code> 事件都是在这个回调中完成的。</p>
+
+<h4 id="54-手势识别">5.4 手势识别</h4>
+
+<p>当上面的<code class="highlighter-rouge"> _UIApplicationHandleEventQueue() </code>识别了一个手势时，其首先会调用 Cancel 将当前的 <code class="highlighter-rouge">touchesBegin/Move/End</code> 系列回调打断。随后系统将对应的 <code class="highlighter-rouge">UIGestureRecognizer</code> 标记为待处理。</p>
+
+<p>苹果注册了一个 Observer 监测 <code class="highlighter-rouge">BeforeWaiting</code> (Loop即将进入休眠) 事件，这个Observer的回调函数是 <code class="highlighter-rouge">_UIGestureRecognizerUpdateObserver()</code>，其内部会获取所有刚被标记为待处理的 <code class="highlighter-rouge">GestureRecognizer</code>，并执行<code class="highlighter-rouge">GestureRecognizer</code>的回调。</p>
+
+<p>当有 <code class="highlighter-rouge">UIGestureRecognizer</code> 的变化(创建/销毁/状态改变)时，这个回调都会进行相应处理。</p>
+
+<h4 id="55-界面更新">5.5 界面更新</h4>
+
+<p>当在操作 UI 时，比如改变了 Frame、更新了<code class="highlighter-rouge"> UIView/CALayer</code> 的层次时，或者手动调用了<code class="highlighter-rouge"> UIView/CALayer</code> 的 <code class="highlighter-rouge">setNeedsLayout/setNeedsDisplay</code>方法后，这个<code class="highlighter-rouge"> UIView/CALayer</code> 就被标记为待处理，并被提交到一个全局的容器去。</p>
+
+<p>苹果注册了一个 Observer 监听 <code class="highlighter-rouge">BeforeWaiting</code>(即将进入休眠) 和<code class="highlighter-rouge"> Exit </code>(即将退出Loop) 事件，回调去执行一个很长的函数：
+<code class="highlighter-rouge">_ZN2CA11Transaction17observer_callbackEP19__CFRunLoopObservermPv()</code>。这个函数里会遍历所有待处理的 <code class="highlighter-rouge">UIView/CAlayer</code> 以执行实际的绘制和调整，并更新 UI 界面。</p>
+
+<h4 id="56-afnetworking20-常驻线程">5.6 AFNetworking2.0 常驻线程</h4>
+
+<p><code class="highlighter-rouge">AFURLConnectionOperation</code> 这个类是基于 <code class="highlighter-rouge">NSURLConnection</code> 构建的，其希望能在后台线程接收 <code class="highlighter-rouge">Delegate</code> 回调。为此 <code class="highlighter-rouge">AFNetworking</code> 单独创建了一个线程，并在这个线程中启动了一个 <code class="highlighter-rouge">RunLoop</code>：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>+ (void)networkRequestThreadEntryPoint:(id)__unused object {
+    @autoreleasepool {
+        [[NSThread currentThread] setName:@"AFNetworking"];
+        NSRunLoop *runLoop = [NSRunLoop currentRunLoop];
+        [runLoop addPort:[NSMachPort port] forMode:NSDefaultRunLoopMode];
+        [runLoop run];
+    }
+}
+
++ (NSThread *)networkRequestThread {
+    static NSThread *_networkRequestThread = nil;
+    static dispatch_once_t oncePredicate;
+    dispatch_once(&amp;oncePredicate, ^{
+        _networkRequestThread = [[NSThread alloc] initWithTarget:self selector:@selector(networkRequestThreadEntryPoint:) object:nil];
+        [_networkRequestThread start];
+    });
+    return _networkRequestThread;
+}
+</code></pre></div></div>
+
+<p><code class="highlighter-rouge">RunLoop</code> 启动前内部必须要有至少一个 <code class="highlighter-rouge">Timer</code>/<code class="highlighter-rouge">Observer</code>/<code class="highlighter-rouge">Source</code>，所以 <code class="highlighter-rouge">AFNetworking</code> 在 <code class="highlighter-rouge">[runLoop run]</code> 之前先创建了一个新的 <code class="highlighter-rouge">NSMachPort</code> 添加进去了。通常情况下，调用者需要持有这个 <code class="highlighter-rouge">NSMachPort (mach_port)</code> 并在外部线程通过这个 <code class="highlighter-rouge">port</code> 发送消息到 <code class="highlighter-rouge">loop</code> 内；但此处添加 <code class="highlighter-rouge">port</code> 只是为了让 <code class="highlighter-rouge">RunLoop</code> 不至于退出，并没有用于实际的发送消息。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>- (void)start {
+    [self.lock lock];
+    if ([self isCancelled]) {
+        [self performSelector:@selector(cancelConnection) onThread:[[self class] networkRequestThread] withObject:nil waitUntilDone:NO modes:[self.runLoopModes allObjects]];
+    } else if ([self isReady]) {
+        self.state = AFOperationExecutingState;
+        [self performSelector:@selector(operationDidStart) onThread:[[self class] networkRequestThread] withObject:nil waitUntilDone:NO modes:[self.runLoopModes allObjects]];
+    }
+    [self.lock unlock];
+}
+</code></pre></div></div>
+
+<p>当需要这个后台线程执行任务时，<code class="highlighter-rouge">AFNetworking</code> 通过调用 <code class="highlighter-rouge">[NSObject performSelector:onThread:..]</code> 将这个任务扔到了后台线程的 <code class="highlighter-rouge">RunLoop</code> 中。</p>
+:ET
