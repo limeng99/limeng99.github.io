@@ -10,7 +10,7 @@ thumbnail: "assets/img/article/operation.jpg"
 
 NSOperation、NSOperationQueue 是苹果提供给我们的一套多线程解决方案。NSOperation、NSOperationQueue是基于GCD更高一层的封装，完全面向对象。但是比GCD更简单易用、代码可读性也更高。
 
-## 1. 简介
+## 一简介
 
 NSOperation本身是抽象基类，不能直接使用，但是他封装了需要执行的操作和执行操作所需的数据方法等。在NSOperation基础上，系统提供了两个子类NSBlockOperation和NSInvocationOperation供我们具体使用，当然，我们也可以自己封装自定义的NSOperation
 
@@ -22,7 +22,7 @@ NSOperation本身是抽象基类，不能直接使用，但是他封装了需要
 -  可以很方便的取消一个操作的执行；
 - 使用 KVO 观察对操作执行状态的更改：`isExecuteing`、`isFinished`、`isCancelled`
 
-## 2.  操作-NSOperation和操作队列-NSOperationQueue
+## 二、操作-NSOperation和操作队列-NSOperationQueue
 
 在 NSOperation、NSOperationQueue中也有类似的**任务（操作）**和**队列（操作队列）**的概念。
 
@@ -38,7 +38,7 @@ NSOperation本身是抽象基类，不能直接使用，但是他封装了需要
 - 操作队列通过设置**最大并发操作数（`maxConcurrentOperationCount`）**来控制并发、串行。
 - NSOperationQueue 为我们提供了两种不同类型的队列：主队列和自定义队列。主队列运行在主线程之上，而自定义队列在后台执行。
 
-## 3. NSOperation的常用方法、属性介绍
+## 三、NSOperation的常用方法、属性介绍
 
 ### 3.1 NSOperation方法介绍
 
@@ -109,7 +109,7 @@ NSOperation本身是抽象基类，不能直接使用，但是他封装了需要
 - (instancetype)initWithTarget:(id)target selector:(SEL)sel object:(id)arg;
 ```
 
-## 4、NSOperationQueue的常用方法、属性介绍
+## 四、NSOperationQueue的常用方法、属性介绍
 
 ```
 // 取消队列的所有操作
@@ -146,7 +146,7 @@ NSOperation本身是抽象基类，不能直接使用，但是他封装了需要
 暂停和取消的区别就在于：暂停操作之后还可以恢复操作，继续向下执行；而取消操作之后，所有的操作就清空了，无法再接着执行剩下的操作。
 ```
 
-## 5、 NSOperation 和 NSOperationQueue 基本使用
+## 五、NSOperation 和 NSOperationQueue 基本使用
 
 ### 5.1 创建操作
 
@@ -414,7 +414,7 @@ NSOperationQueue *queue = [[NSOperationQueue alloc] init];
 
 使用 `addOperationWithBlock:` 将操作加入到操作队列后能够开启新线程，进行并发执行。
 
-## 6. NSOperationQueue 控制串行执行、并发执行
+## 六、NSOperationQueue 控制串行执行、并发执行
 
 NSOperationQueue通过`maxConcurrentOperationCount`(最大并发操作数)。用来控制一个特定队列中可以有多少个操作同时参与并发执行。
 
@@ -485,7 +485,7 @@ NSOperationQueue通过`maxConcurrentOperationCount`(最大并发操作数)。用
 
 当最大并发操作数为1时，操作是按顺序串行执行的，并且一个操作完成之后，下一个操作才开始执行。当最大操作并发数为2时，操作是并发执行的，可以同时执行两个操作。而开启线程数量是由系统决定的，不需要我们来管理。
 
-## 7. NSOperation 操作依赖
+## 七、NSOperation 操作依赖
 
 NSOperation、NSOperationQueue最吸引人的地方是它能添加操作之间的依赖关系。通过操作依赖，我们可以很方便的控制操作之间的执行先后顺序。
 
@@ -536,7 +536,7 @@ NSOperation、NSOperationQueue最吸引人的地方是它能添加操作之间�
 
 通过添加操作依赖，无论运行几次，其结果都是 op1 先执行，op2 后执行。
 
-## 8. NSOperation 优先级
+## 八、NSOperation 优先级
 
 NSOperation 提供了`queuePriority`（优先级）属性，`queuePriority`属性适用于同一操作队列中的操作，不适用于不同操作队列中的操作。默认情况下，所有新创建的操作对象优先级都是`NSOperationQueuePriorityNormal`。但是我们可以通过`setQueuePriority:`方法来改变当前操作在同一队列中的执行优先级。
 
@@ -563,7 +563,7 @@ typedef NS_ENUM(NSInteger, NSOperationQueuePriority) {
 
 - 如果，一个队列中既包含了准备就绪状态的操作，又包含了未准备就绪的操作，未准备就绪的操作优先级比准备就绪的操作优先级高。那么，虽然准备就绪的操作优先级低，也会优先执行。优先级不能取代依赖关系。如果要控制操作间的启动顺序，则必须使用依赖关系。
 
-## 9. NSOperation、NSOperationQueue 线程间的通信
+## 九、NSOperation、NSOperationQueue 线程间的通信
 
 ```
 // 线程间通信

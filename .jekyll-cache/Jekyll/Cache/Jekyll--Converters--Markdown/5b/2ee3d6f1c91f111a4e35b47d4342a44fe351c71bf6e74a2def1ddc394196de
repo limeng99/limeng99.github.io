@@ -1,0 +1,244 @@
+I"I=<p>本人也看着众大神的文章才对runloop有了一定的了解，希望通过这篇文章来记录并加深对runloop的理解。<a href="https://opensource.apple.com/tarballs/CF/">CFRunloop源代码</a></p>
+
+<h3 id="一runloop简介">一、RunLoop简介</h3>
+
+<p>RunLoop 实际上就是一个对象，这个对象管理了其需要处理的事件和消息，并提供了一个入口函数来执行上面 Event Loop 的逻辑。线程执行了这个函数后，就会一直处于这个函数内部 “接受消息-&gt;等待-&gt;处理” 的循环中，直到这个循环结束（比如传入 quit 的消息），函数返回。</p>
+
+<p>OSX/iOS 系统中，提供了两个这样的对象：<code class="highlighter-rouge">NSRunLoop</code> 和 <code class="highlighter-rouge">CFRunLoopRef</code>。</p>
+
+<ul>
+  <li><code class="highlighter-rouge">CFRunLoopRef</code> 是在 <code class="highlighter-rouge">CoreFoundation</code> 框架内的，它提供了纯 C 函数的 API，所有这些 API 都是线程安全的。</li>
+  <li><code class="highlighter-rouge">NSRunLoop</code> 是基于 <code class="highlighter-rouge">CFRunLoopRef</code> 的封装，提供了面向对象的 API，但是这些 API 不是线程安全的。</li>
+</ul>
+
+<h3 id="二runloop与线程关系">二、RunLoop与线程关系</h3>
+
+<p>RunLoop 和线程是息息相关的，我们知道线程的作用是用来执行特定的一个或多个任务，在默认情况下，线程执行完之后就会退出，就不能再执行任务了。这时我们就需要采用一种方式来让线程能够不断地处理任务，并不退出。所以，我们就有了 RunLoop。</p>
+
+<p>苹果不允许直接创建 RunLoop，它只提供了两个自动获取的函数：<code class="highlighter-rouge">CFRunLoopGetMain()</code> 和 <code class="highlighter-rouge">CFRunLoopGetCurrent()</code>。 这两个函数源码为下面这样:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 全局的Dictionary，key 是 pthread_t， value 是 CFRunLoopRef
+static CFMutableDictionaryRef __CFRunLoops = NULL;
+// 访问 __CFRunLoops 时的锁
+static CFSpinLock_t loopsLock = CFSpinLockInit;
+
+CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
+    if (pthread_equal(t, kNilPthreadT)) {
+				t = pthread_main_thread_np();
+    }
+    __CFSpinLock(&amp;loopsLock);
+    if (!__CFRunLoops) {
+    		// 第一次进入时，初始化全局 __CFRunLoops，并先为主线程创建一个 RunLoop
+        __CFSpinUnlock(&amp;loopsLock);
+				CFMutableDictionaryRef dict = CFDictionaryCreateMutable(kCFAllocatorSystemDefault, 0, NULL, &amp;kCFTypeDictionaryValueCallBacks);
+				CFRunLoopRef mainLoop = __CFRunLoopCreate(pthread_main_thread_np());
+				CFDictionarySetValue(dict, pthreadPointer(pthread_main_thread_np()), mainLoop);
+        if (!OSAtomicCompareAndSwapPtrBarrier(NULL, dict, (void * volatile *)&amp;__CFRunLoops)) {
+            CFRelease(dict);
+        }
+				CFRelease(mainLoop);
+        __CFSpinLock(&amp;loopsLock);
+    }
+    // 直接从 __CFRunLoops 里获取
+    CFRunLoopRef loop = (CFRunLoopRef)CFDictionaryGetValue(__CFRunLoops, pthreadPointer(t));
+    __CFSpinUnlock(&amp;loopsLock);
+    if (!loop) {
+    		// 获取不到时，创建一个
+				CFRunLoopRef newLoop = __CFRunLoopCreate(t);
+        __CFSpinLock(&amp;loopsLock);
+				loop = (CFRunLoopRef)CFDictionaryGetValue(__CFRunLoops, pthreadPointer(t));
+				if (!loop) {
+	    			CFDictionarySetValue(__CFRunLoops, pthreadPointer(t), newLoop);
+	    			loop = newLoop;
+				}
+   			 __CFSpinUnlock(&amp;loopsLock);
+				CFRelease(newLoop);
+    }
+    if (pthread_equal(t, pthread_self())) {
+    		// 注册一个回调，当线程销毁时，顺便也销毁其对应的 RunLoop。
+       	_CFSetTSD(__CFTSDKeyRunLoop, (void *)loop, NULL);
+        if (0 == _CFGetTSD(__CFTSDKeyRunLoopCntr)) {
+            _CFSetTSD(__CFTSDKeyRunLoopCntr, (void *)(PTHREAD_DESTRUCTOR_ITERATIONS-1), (void (* (void *))__CFFinalizeRunLoop);
+        }
+    }
+    return loop;
+}
+
+CFRunLoopRef CFRunLoopGetMain(void) {
+    CHECK_FOR_FORK();
+    static CFRunLoopRef __main = NULL; // no retain needed
+    // pthread_main_thread_np() 为主线程
+    if (!__main) __main = _CFRunLoopGet0(pthread_main_thread_np()); // no CAS needed
+    return __main;
+}
+
+CFRunLoopRef CFRunLoopGetCurrent(void) {
+    CHECK_FOR_FORK();
+    CFRunLoopRef rl = (CFRunLoopRef)_CFGetTSD(__CFTSDKeyRunLoop);
+    if (rl) return rl;
+    // pthread_self() 为当前线程
+    return _CFRunLoopGet0(pthread_self());
+}
+
+void CFRunLoopRun(void) {	/* DOES CALLOUT */
+    int32_t result;
+    do {
+        result = CFRunLoopRunSpecific(CFRunLoopGetCurrent(), kCFRunLoopDefaultMode, 1.0e10, false);
+        CHECK_FOR_FORK();
+    } while (kCFRunLoopRunStopped != result &amp;&amp; kCFRunLoopRunFinished != result);
+}
+</code></pre></div></div>
+
+<p>从上面的代码可以看出，线程和 RunLoop 之间是一一对应的，其关系是保存在一个全局的 Dictionary 里。线程刚创建时并没有 RunLoop，如果你不主动获取，那它一直都不会有。RunLoop 的创建是发生在第一次获取时，RunLoop 的销毁是发生在线程结束时。你只能在一个线程的内部获取其 RunLoop（主线程除外）。</p>
+
+<p>RunLoop与线程之间的关系密不可分:</p>
+
+<ul>
+  <li>线程与RunLoop是一一对应的，一个线程对应一个RunLoop对象，RunLoop不能自己创建。</li>
+  <li>主线程的RunLoop在应用启动的时候会自动创建，非主线程的RunLoop需要在该线程自己启动。</li>
+  <li>RunLoop对象在第一次获取RunLoop时创建，销毁则是在线程结束的时候。</li>
+  <li>RunLoop并不是线程安全的，只能在当前线程中操作当前线程的RunLoop，而不能去操作其他线程的RunLoop，同时也需要避免在其他线程上调用当前线程的RunLoop。</li>
+</ul>
+
+<h3 id="三runloop相关类">三、RunLoop相关类</h3>
+
+<p>在 <code class="highlighter-rouge">CoreFoundation</code> 里面关于 RunLoop 有5个类:</p>
+
+<ol>
+  <li><code class="highlighter-rouge">CFRunLoopRef</code>：代表 RunLoop 的对象</li>
+  <li><code class="highlighter-rouge">CFRunLoopModeRef</code>：代表 RunLoop 的运行模式</li>
+  <li><code class="highlighter-rouge">CFRunLoopSourceRef</code>：就是 RunLoop 模型图中提到的输入源 / 事件源</li>
+  <li><code class="highlighter-rouge">CFRunLoopTimerRef</code>：就是 RunLoop 模型图中提到的定时源</li>
+  <li><code class="highlighter-rouge">CFRunLoopObserverRef</code>：观察者，能够监听 RunLoop 的状态改变</li>
+</ol>
+
+<p>其中 <code class="highlighter-rouge">CFRunLoopModeRef</code> 类并没有对外暴露，只是通过 <code class="highlighter-rouge">CFRunLoopRef </code>的接口进行了封装。他们的关系如下:</p>
+
+<p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/runloop-class.png" alt="runloop-class" /></p>
+
+<p>一个RunLoop对象<code class="highlighter-rouge">CFRunLoopRef</code>中包含若干个运行模式<code class="highlighter-rouge">CFRunLoopModeRef</code>。而每一个运行模式下又包含若干个输入源<code class="highlighter-rouge">CFRunLoopSourceRef</code>、定时源<code class="highlighter-rouge">CFRunLoopTimerRef</code>、观察者<code class="highlighter-rouge">CFRunLoopObserverRef</code>。</p>
+
+<ul>
+  <li>
+    <p>每次 RunLoop 启动时，只能指定其中一个运行模式<code class="highlighter-rouge">CFRunLoopModeRef</code>，这个运行模式<code class="highlighter-rouge">CFRunLoopModeRef</code>被称作当前运行模式<code class="highlighter-rouge">CurrentMode</code>。</p>
+  </li>
+  <li>
+    <p>如果需要切换运行模式<code class="highlighter-rouge">CFRunLoopModeRef</code>，只能退出当前 RunLoop，再重新指定一个运行模式<code class="highlighter-rouge">CFRunLoopModeRef</code>进入。</p>
+  </li>
+  <li>
+    <p>主要是为了分隔开不同组的输入源<code class="highlighter-rouge">CFRunLoopSourceRef</code>、定时源<code class="highlighter-rouge">CFRunLoopTimerRef</code>、观察者<code class="highlighter-rouge">CFRunLoopObserverRef</code>，让其互不影响。</p>
+  </li>
+</ul>
+
+<h4 id="31-cfrunloopref">3.1 CFRunLoopRef</h4>
+
+<p><code class="highlighter-rouge">CFRunLoopRef</code> 是 <code class="highlighter-rouge">Core Foundation</code> 框架下 RunLoop 对象类。我们可通过以下方式来获取 RunLoop 对象：</p>
+
+<p>Core Foundation 框架下:</p>
+
+<ul>
+  <li><code class="highlighter-rouge">CFRunLoopGetCurrent();</code> // 获得当前线程的 RunLoop 对象</li>
+  <li><code class="highlighter-rouge">CFRunLoopGetMain(); </code> // 获得主线程的 RunLoop 对象</li>
+</ul>
+
+<p>在Foundation框架下</p>
+
+<ul>
+  <li><code class="highlighter-rouge">[NSRunLoop currentRunLoop];</code> // 获得当前线程的 RunLoop 对象</li>
+  <li><code class="highlighter-rouge">[NSRunLoop mainRunLoop];</code> // 获得主线程的 RunLoop 对象</li>
+</ul>
+
+<p><code class="highlighter-rouge">CFRunLoopRef</code>源码：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>struct __CFRunLoop {
+    ...
+    CFMutableSetRef _commonModes; 			// Set 集合
+    CFMutableSetRef _commonModeItems;   // Set&lt;Source/Observer/Timer&gt; 集合 
+    CFRunLoopModeRef _currentMode;			// Current Runloop Mode
+    CFMutableSetRef _modes;							// Set 集合
+    ...
+};
+</code></pre></div></div>
+
+<h4 id="32-cfrunloopmoderef">3.2 CFRunLoopModeRef</h4>
+
+<p>系统默认定义了多种运行模式<code class="highlighter-rouge">CFRunLoopModeRef</code>，如下：</p>
+
+<ol>
+  <li><strong><code class="highlighter-rouge">kCFRunLoopDefaultMode</code></strong>：App的默认运行模式，通常主线程是在这个运行模式下运行</li>
+  <li><strong><code class="highlighter-rouge">UITrackingRunLoopMode</code></strong>：跟踪用户交互事件（用于 ScrollView 追踪触摸滑动，保证界面滑动时不受其他Mode影响）</li>
+  <li><code class="highlighter-rouge">UIInitializationRunLoopMode</code>：在刚启动App时第进入的第一个 Mode，启动完成后就不再使用</li>
+  <li><code class="highlighter-rouge">GSEventReceiveRunLoopMode</code>：接受系统内部事件，通常用不到</li>
+  <li><strong><code class="highlighter-rouge">kCFRunLoopCommonModes</code></strong>：伪模式，不是一种真正的运行模式（后边会用到）</li>
+</ol>
+
+<p>其中<strong><code class="highlighter-rouge">kCFRunLoopDefaultMode</code></strong>、<strong><code class="highlighter-rouge">UITrackingRunLoopMode</code></strong>、<strong><code class="highlighter-rouge">kCFRunLoopCommonModes</code></strong>是我们开发中需要用到的模式。</p>
+
+<p><code class="highlighter-rouge">CFRunLoopModeRef</code>源码如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>struct __CFRunLoopMode {
+    ...
+    CFStringRef _name;  							// Mode Name, 例如 @"kCFRunLoopDefaultMode"
+    CFMutableSetRef _sources0;				// Set 集合
+    CFMutableSetRef _sources1;				// Set 集合
+    CFMutableArrayRef _observers;     // Array 数组
+    CFMutableArrayRef _timers;				// Array 数组
+    CFMutableDictionaryRef _portToV1SourceMap;
+    __CFPortSet _portSet;
+    CFIndex _observerMask;
+		....
+    uint64_t _timerSoftDeadline; /* TSR */
+    uint64_t _timerHardDeadline; /* TSR */
+};
+</code></pre></div></div>
+
+<p>一个 RunLoop 对象包含若干个 Mode 对象，每个 Mode 又包含若干个 Source/Timer/Observer，RunLoop 一次运行只能在一个 Mode 之下，如果需要切换 Mode，需要退出 RunLoop 才能重新指定一个 Mode。这样做主要是为了分隔开不同组Source/Timer/Observer，让其互不影响。</p>
+
+<h4 id="33-cfrunlooptimerref">3.3 CFRunLoopTimerRef</h4>
+
+<p><code class="highlighter-rouge">CFRunLoopTimerRef</code>是定时源（RunLoop模型图中提到过），理解为基于时间的触发器，基本上就是<code class="highlighter-rouge">NSTimer</code>。</p>
+
+<p>一个比较常见的问题：滑动tableView时，定时器还会生效吗？</p>
+
+<p>默认情况下RunLoop运行在<code class="highlighter-rouge">kCFRunLoopDefaultMode</code>下，而当滑动tableView时，RunLoop切换到<code class="highlighter-rouge">UITrackingRunLoopMode</code>，而Timer是在<code class="highlighter-rouge">kCFRunLoopDefaultMode</code>下的，就无法接受处理Timer的事件。</p>
+
+<p>怎么去解决这个问题呢？把Timer添加到UITrackingRunLoopMode上并不能解决问题，因为这样在默认情况下就无法接受定时器事件了。 所以我们需要把Timer同时添加到<code class="highlighter-rouge">UITrackingRunLoopMode</code>和<code class="highlighter-rouge">kCFRunLoopDefaultMode</code>上。
+ 那么如何把timer同时添加到多个mode上呢？就要用到<code class="highlighter-rouge">NSRunLoopCommonModes</code>了。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[[NSRunLoop currentRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+</code></pre></div></div>
+
+<p>Timer就被添加到多个mode上，这样即使RunLoop由<code class="highlighter-rouge">kCFRunLoopDefaultMode</code>切换到<code class="highlighter-rouge">UITrackingRunLoopMode</code>下，也不会影响接收Timer事件。</p>
+
+<h4 id="34-cfrunloopsourceref">3.4 CFRunLoopSourceRef</h4>
+
+<p><code class="highlighter-rouge">CFRunLoopSourceRef</code> 是事件产生的地方。Source有两个版本：Source0 和 Source1</p>
+
+<ul>
+  <li>Source0 只包含了一个回调（函数指针），它并不能主动触发事件。使用时，你需要先调用 <code class="highlighter-rouge">CFRunLoopSourceSignal(source)</code>，将这个 Source 标记为待处理，然后手动调用 <code class="highlighter-rouge">CFRunLoopWakeUp(runloop) </code>来唤醒 RunLoop，让其处理这个事件。</li>
+  <li>Source1 包含了一个 mach_port 和一个回调（函数指针），被用于通过内核和其他线程相互发送消息。这种 Source 能主动唤醒 RunLoop 的线程，其原理在下面会讲到。</li>
+</ul>
+
+<h4 id="35-cfrunloopobserverref">3.5 CFRunLoopObserverRef</h4>
+
+<p><code class="highlighter-rouge">CFRunLoopObserverRef</code>是观察者，用来监听RunLoop的状态改变。</p>
+
+<p><code class="highlighter-rouge">CFRunLoopObserverRef</code>可以监听的状态改变有以下几种：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity) {
+    kCFRunLoopEntry = (1UL &lt;&lt; 0),               // 即将进入RunLoop：1
+    kCFRunLoopBeforeTimers = (1UL &lt;&lt; 1),        // 即将处理Timer：2    
+    kCFRunLoopBeforeSources = (1UL &lt;&lt; 2),       // 即将处理Source：4
+    kCFRunLoopBeforeWaiting = (1UL &lt;&lt; 5),       // 即将进入休眠：32
+    kCFRunLoopAfterWaiting = (1UL &lt;&lt; 6),        // 即将从休眠中唤醒：64
+    kCFRunLoopExit = (1UL &lt;&lt; 7),                // 即将从Loop中退出：128
+    kCFRunLoopAllActivities = 0x0FFFFFFFU       // 监听全部状态改变  
+};
+</code></pre></div></div>
+
+<h3 id="四runloop原理">四、RunLoop原理</h3>
+
+<p>根据苹果在<a href="https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/Multithreading/RunLoopManagement/RunLoopManagement.html#//apple_ref/doc/uid/10000057i-CH16-SW23">文档</a>里的说明，RunLoop 内部的逻辑大致如下:</p>
+
+<p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/runloop-class.png" alt="runloop-chart" /></p>
+:ET

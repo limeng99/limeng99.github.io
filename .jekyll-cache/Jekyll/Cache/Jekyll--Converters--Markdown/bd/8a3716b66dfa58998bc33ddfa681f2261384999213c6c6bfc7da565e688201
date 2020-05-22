@@ -1,0 +1,36 @@
+I"�
+<ul>
+  <li><a href="#一简介">一简介</a></li>
+  <li><a href="#二操作-nsoperation和操作队列-nsoperationqueue">二、操作-NSOperation和操作队列-NSOperationQueue</a></li>
+  <li><a href="#三nsoperation的常用方法属性介绍">三、NSOperation的常用方法、属性介绍</a>
+    <ul>
+      <li><a href="#31-nsoperation方法介绍">3.1 NSOperation方法介绍</a></li>
+      <li><a href="#32-nsblockoperation方法介绍">3.2 NSBlockOperation方法介绍</a></li>
+      <li><a href="#33-nsinvocationoperation方法介绍">3.3 NSInvocationOperation方法介绍</a></li>
+    </ul>
+  </li>
+  <li><a href="#四nsoperationqueue的常用方法属性介绍">四、NSOperationQueue的常用方法、属性介绍</a></li>
+  <li><a href="#五nsoperation-和-nsoperationqueue-基本使用">五、NSOperation 和 NSOperationQueue 基本使用</a>
+    <ul>
+      <li><a href="#51-创建操作">5.1 创建操作</a>
+        <ul>
+          <li><a href="#511-使用子类-nsinvocationoperation">5.1.1 使用子类 NSInvocationOperation</a></li>
+          <li><a href="#512-使用子类-nsblockoperation">5.1.2 使用子类 NSBlockOperation</a></li>
+          <li><a href="#513-使用自定义继承自-nsoperation-的子类">5.1.3 使用自定义继承自 NSOperation 的子类</a></li>
+        </ul>
+      </li>
+      <li><a href="#52-创建队列">5.2 创建队列</a></li>
+      <li><a href="#53-将操作加入到队列中">5.3 将操作加入到队列中</a>
+        <ul>
+          <li><a href="#531--addoperation添加操作到队列">5.3.1  addOperation添加操作到队列</a></li>
+          <li><a href="#532--addoperationwithblock添加操作到队列">5.3.2  addOperationWithBlock添加操作到队列</a></li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+  <li><a href="#六nsoperationqueue-控制串行执行并发执行">六、NSOperationQueue 控制串行执行、并发执行</a></li>
+  <li><a href="#七nsoperation-操作依赖">七、NSOperation 操作依赖</a></li>
+  <li><a href="#八nsoperation-优先级">八、NSOperation 优先级</a></li>
+  <li><a href="#九nsoperationnsoperationqueue-线程间的通信">九、NSOperation、NSOperationQueue 线程间的通信</a></li>
+</ul>
+:ET
