@@ -1,9 +1,0 @@
-I"
-
-<ul>
-  <li><a href="#1exe">1、exe()</a></li>
-  <li><a href="#2-加载可执行文件">2、 加载可执行文件</a></li>
-  <li><a href="#3加载dyld">3、加载Dyld</a></li>
-  <li><a href="#main加载前启动优化">main()加载前启动优化：</a></li>
-</ul>
-:ET

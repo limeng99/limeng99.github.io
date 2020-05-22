@@ -1,7 +1,0 @@
-I"+<h3 id="1一个nsobject占用多少内存">1、一个NSObject占用多少内存？</h3>
-
-<p>如果我们想要搞清楚<code class="highlighter-rouge">obj</code>对象所指指针的大小，那么我们只要搞清楚<code class="highlighter-rouge">NSObjcet</code>在内存的布局及其底层相关的知识。</p>
-
-<p>其实我们平时编写的<code class="highlighter-rouge">Objective-C</code>代码，底层实现其实都是<code class="highlighter-rouge">C/C++</code>代码，所以OC的面向对象都是基于C/C++的数据结构实现的</p>
-
-:ET

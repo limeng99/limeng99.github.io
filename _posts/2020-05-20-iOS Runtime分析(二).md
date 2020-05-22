@@ -9,7 +9,7 @@ thumbnail: "assets/img/article/runtime.jpg"
 typora-root-url: ../assets
 ---
 
-[Runtime源码下载](https://www.jianshu.com/go-wild?ac=2&url=https%3A%2F%2Fopensource.apple.com%2Ftarballs%2Fobjc4%2F)
+[Runtime源码下载](https://opensource.apple.com/tarballs/objc4)
 
 ### 1、一个NSObject占用多少内存？
 

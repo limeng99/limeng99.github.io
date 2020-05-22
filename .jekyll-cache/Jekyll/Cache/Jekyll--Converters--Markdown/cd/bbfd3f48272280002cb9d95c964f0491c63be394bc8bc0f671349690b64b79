@@ -1,2 +1,0 @@
-I"7<p>在调用<code class="highlighter-rouge">main()</code>函数之前，基本所有工作都是由操作系统完成的，开发者能够插手的地方不多，多以如果想要想要优化这段时间，就必须了解，操作系统在<code class="highlighter-rouge">main()</code>之前做了什么。</p>
-:ET
