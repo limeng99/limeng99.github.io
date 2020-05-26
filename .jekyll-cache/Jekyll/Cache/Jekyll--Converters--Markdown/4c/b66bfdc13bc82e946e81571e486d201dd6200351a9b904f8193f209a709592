@@ -1,4 +1,4 @@
-I"�`<p>Block 是开发过程中常用便捷的回调方式，那么block底层是怎么实现的呢？为什么会造成循环引用？下面将会解答上述问题。</p>
+I"lv<p>Block 是开发过程中常用便捷的回调方式，那么block底层是怎么实现的呢？为什么会造成循环引用？下面将会解答上述问题。</p>
 
 <h3 id="一block源码">一、Block源码</h3>
 
@@ -505,7 +505,7 @@ int main() {
 
 <h3 id="六block内存管理">六、Block内存管理</h3>
 
-<h4 id="61-block访问oc对象">6.1 block访问OC对象</h4>
+<h4 id="61-block访问oc对象">6.1 Block访问OC对象</h4>
 
 <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>int main() {
     LMPerson *person = [[LMPerson alloc] init];
@@ -596,7 +596,143 @@ int main() {
     person.block();
     return 0;
 }
-// 
+// 输出日志：person 10
 </code></pre></div></div>
+
+<p>程序结束，person都没有释放，造成了内存泄漏，造成循环引用的原因block内部有个强指针指向person，下面代码生成cpp文件</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>struct __main_block_impl_0 {
+  struct __block_impl impl;
+  struct __main_block_desc_0* Desc;
+  // 强指针指向person
+  LMPerson *person;
+  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, LMPerson *_person, int flags=0) : person(_person) {
+    impl.isa = &amp;_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+</code></pre></div></div>
+
+<p>当程序退出的时候，局部变量person销毁，但是由于LMPerson和block互相强引用，谁都释放不了。</p>
+
+<h4 id="63-__weak解决循环引用">6.3 __weak解决循环引用</h4>
+
+<p>为了解决上面的问题，只需要用<code class="highlighter-rouge">__weak</code>来修饰，即可</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>int main() {
+    LMPerson *person = [[LMPerson alloc] init];
+    person.age = 10;
+    __weak LMPerson *weakPerson = person;
+    person.block = ^{
+        NSLog(@"person %d", weakPerson.age);
+    };
+    person.block();
+    return 0;
+}
+
+// 输出日志：person 10   -[LMPerson dealloc]
+</code></pre></div></div>
+
+<p>代码生成main.cpp文件</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>struct __main_block_impl_0 {
+  struct __block_impl impl;
+  struct __main_block_desc_0* Desc;
+  // block内部对weakPerson是弱引用
+  LMPerson *__weak weakPerson;
+  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, LMPerson *__weak _weakPerson, int flags=0) : weakPerson(_weakPerson) {
+    impl.isa = &amp;_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+</code></pre></div></div>
+
+<p>当局部变量消失时候，对于LMPseson来说，block以一个弱指针指向它，那它就销毁，然后block也销毁。</p>
+
+<h4 id="64-__unsafe_unretained解决循环引用">6.4 __unsafe_unretained解决循环引用</h4>
+
+<p>也可以用<code class="highlighter-rouge">__unsafe_unretained</code>来解决循环引用</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>int main() {
+    LMPerson *person = [[LMPerson alloc] init];
+    person.age = 10;
+    __unsafe_unretained LMPerson *unsafePerson = person;
+    person.block = ^{
+        NSLog(@"person %d", unsafePerson.age);
+    };
+    person.block();
+    return 0;
+}
+
+// 输出日志：person 10   -[LMPerson dealloc]
+</code></pre></div></div>
+
+<p>代码生成main.cpp文件</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>struct __main_block_impl_0 {
+  struct __block_impl impl;
+  struct __main_block_desc_0* Desc;
+  LMPerson *__unsafe_unretained unsafePerson;
+  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, LMPerson *__unsafe_unretained _weakPerson, int flags=0) : weakPerson(_weakPerson) {
+    impl.isa = &amp;_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+</code></pre></div></div>
+
+<p>虽然<code class="highlighter-rouge">__unsafe_unretained</code>可以解决循环引用，但是最好不要用，但<code class="highlighter-rouge">__unsafe_unretained</code>不安全，指向的对象销毁时，指针存储的地址值不变。而<code class="highlighter-rouge">__weak</code>，指向的对象销毁时，会自动让指针置为nil，建议使用<code class="highlighter-rouge">__weak</code>。</p>
+
+<h4 id="65-__block解决循环引用">6.5 __block解决循环引用</h4>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>int main() {
+    __block LMPerson *person = [[LMPerson alloc] init];
+    person.age = 10;
+    person.block = ^{
+        NSLog(@"person %d", person.age);
+        //这一句不能少
+        person = nil;
+    };
+    // block必须调用一次，这样person才能赋nil，从而释放
+    person.block();
+    return 0;
+}
+
+// 输出日志：person 10   -[LMPerson dealloc]
+</code></pre></div></div>
+
+<p>代码生成main.cpp文件</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>struct __Block_byref_person_0 {
+  void *__isa;
+__Block_byref_person_0 *__forwarding;
+ int __flags;
+ int __size;
+ void (*__Block_byref_id_object_copy)(void*, void*);
+ void (*__Block_byref_id_object_dispose)(void*);
+ LMPerson *__strong person;
+};
+
+struct __main_block_impl_0 {
+  struct __block_impl impl;
+  struct __main_block_desc_0* Desc;
+  __Block_byref_person_0 *person; // by ref
+  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, __Block_byref_person_0 *_person, int flags=0) : person(_person-&gt;__forwarding) {
+    impl.isa = &amp;_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+</code></pre></div></div>
+
+<p>也是可以解决循环引用的。但是需要注意的是，<code class="highlighter-rouge">person.block();</code>必须调用一次，为了执行<code class="highlighter-rouge">person = nil;</code>。</p>
+
+<p>当执行完<code class="highlighter-rouge">person = nil</code>时候,<code class="highlighter-rouge">__block</code>解除对person的引用,进而，全都解除释放了。 但是必须调用<code class="highlighter-rouge">person = nil</code>才可以，否则，不能解除循环引用。</p>
 
 :ET
