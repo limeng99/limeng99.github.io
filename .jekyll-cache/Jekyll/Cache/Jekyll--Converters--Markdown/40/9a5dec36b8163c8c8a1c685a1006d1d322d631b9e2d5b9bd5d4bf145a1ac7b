@@ -1,0 +1,14 @@
+I"
+<ul>
+  <li><a href="#一block本质">一、Block本质</a></li>
+  <li><a href="#二block捕获变量">二、Block捕获变量</a></li>
+  <li><a href="#三block类型">三、Block类型</a>
+      - {:.} <a href="#三种block类型">三种Block类型</a>
+      - {:.} <a href="#对每种类型block调用copy操作">对每种类型block调用copy操作</a>
+      - {:.} <a href="#block属性的建议写法">Block属性的建议写法</a></li>
+  <li><a href="#四对象类型的auto变量">四、对象类型的auto变量</a>
+      - {:.} <a href="#block代码中有对象类型变量时">Block代码中有对象类型变量时</a>
+      - {:.} <a href="#_weak修饰">_weak修饰</a>
+      - {:.} <a href="#修改局部变量的三种方法">修改局部变量的三种方法</a></li>
+</ul>
+:ET

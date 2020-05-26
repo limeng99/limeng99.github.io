@@ -1,0 +1,23 @@
+I"0<p>Block 是开发过程中常用便捷的回调方式，那么Block底层是怎么实现的呢？为什么会造成循环引用？下面将会解答上述问题。</p>
+
+<h3 id="一block本质">一、Block本质</h3>
+
+<p><strong>先看一个简单的Block调用</strong></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>int main(){
+    int age = 0;
+    void (^block)(void) = ^{
+        NSLog(@"age is %d", age);
+    };
+    block();
+    return 0;
+}
+</code></pre></div></div>
+
+<p><strong>将Objective-C代码转换为C\C++代码</strong></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 在终端输入一下命令
+xcrun  -sdk  iphoneos  clang  -arch  arm64  -rewrite-objc  OC源文件  -o  输出的CPP文件
+</code></pre></div></div>
+
+:ET

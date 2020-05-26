@@ -1,0 +1,87 @@
+I"<p>Block 是开发过程中常用便捷的回调方式，那么Block底层是怎么实现的呢？为什么会造成循环引用？下面将会解答上述问题。</p>
+
+<h3 id="一block本质">一、Block本质</h3>
+
+<p><strong>先看一个简单的Block调用</strong></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>int main(){
+    int age = 0;
+    void (^block)(void) = ^{
+        NSLog(@"age is %d", age);
+    };
+    block();
+    return 0;
+}
+</code></pre></div></div>
+
+<p><strong>将Objective-C代码转换为C\C++代码</strong></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 在终端输入一下命令
+xcrun  -sdk  iphoneos  clang  -arch  arm64  -rewrite-objc  OC源文件  -o  输出的CPP文件
+</code></pre></div></div>
+
+<p><strong>产看Block源码</strong></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>struct __block_impl {
+  void *isa;      //isa指针，所以说Block是对象
+  int Flags;
+  int Reserved;
+  void *FuncPtr;  //函数指针
+};
+
+struct __main_block_impl_0 {
+  struct __block_impl impl;
+  struct __main_block_desc_0* Desc;
+  int age;
+  // 构造函数（类似于OC的init方法），返回结构体对象
+  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, int _age, int flags=0) : age(_age) {
+    impl.isa = &amp;_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+
+static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+  int age = __cself-&gt;age; // bound by copy
+
+        NSLog((NSString *)&amp;__NSConstantStringImpl__var_folders_sx_ygl_c8ln07jdwrz6w5rgbq8m0000gn_T_blcok_8142ea_mi_0, age);
+}
+
+static struct __main_block_desc_0 {
+  size_t reserved;
+  size_t Block_size;
+} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0)};
+
+int main(){
+    int age = 0;
+    // 定义block
+    void (*block)(void) = ((void (*)())&amp;__main_block_impl_0((void *)__main_block_func_0, &amp;__main_block_desc_0_DATA, age));
+    // 执行block
+    ((void (*)(__block_impl *))((__block_impl *)block)-&gt;FuncPtr)((__block_impl *)block);
+    return 0;
+}
+</code></pre></div></div>
+
+<p>从以上源码可看出：</p>
+
+<ul>
+  <li>Block内部有个isa指针，所以它本质上也是一个OC对象。</li>
+  <li>Block是封装了函数调用以及函数调用环境的OC对象。</li>
+  <li>Block是封装函数及其上下文的OC对象。</li>
+</ul>
+
+<h3 id="二block捕获变量">二、Block捕获变量</h3>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>int age = 10;
+void (^block)(void) = ^{
+	NSLog(@"age is %d", age);
+};
+age = 20；
+block();
+
+// 输出值为 age：10
+</code></pre></div></div>
+
+<p>原因：创建block的时候，已经把age的值存储在里面了</p>
+:ET

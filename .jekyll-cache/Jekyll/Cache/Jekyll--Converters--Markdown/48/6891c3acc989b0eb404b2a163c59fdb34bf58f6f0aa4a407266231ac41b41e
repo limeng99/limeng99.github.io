@@ -1,0 +1,33 @@
+I"�
+<ul>
+  <li><a href="#一block源码">一、Block源码</a></li>
+  <li><a href="#二block捕获变量">二、Block捕获变量</a></li>
+  <li><a href="#三block类型">三、Block类型</a>
+    <ul>
+      <li><a href="#31-三种block类型">3.1 三种Block类型</a></li>
+      <li><a href="#32-对每种类型block调用copy操作">3.2 对每种类型block调用copy操作</a></li>
+      <li><a href="#33-block属性的建议写法">3.3 Block属性的建议写法</a></li>
+    </ul>
+  </li>
+  <li><a href="#四对象类型的auto变量">四、对象类型的auto变量</a>
+    <ul>
+      <li><a href="#41-block代码块包含对象类型变量时">4.1 Block代码块包含对象类型变量时</a></li>
+      <li><a href="#_weak修饰">_weak修饰</a></li>
+    </ul>
+  </li>
+  <li><a href="#五block修改局部变量">五、Block修改局部变量</a>
+    <ul>
+      <li><a href="#51-全局变量">5.1 全局变量</a></li>
+      <li><a href="#52-static修饰局部变量">5.2 static修饰局部变量</a></li>
+      <li><a href="#__block来修饰">__block来修饰</a></li>
+    </ul>
+  </li>
+  <li><a href="#六block内存管理">六、Block内存管理</a>
+    <ul>
+      <li><a href="#61-block访问oc对象">6.1 block访问OC对象</a></li>
+      <li><a href="#62循环引用">6.2、循环引用</a></li>
+      <li><a href="#63-__weak解决循环引用">6.3 __weak解决循环引用</a></li>
+    </ul>
+  </li>
+</ul>
+:ET

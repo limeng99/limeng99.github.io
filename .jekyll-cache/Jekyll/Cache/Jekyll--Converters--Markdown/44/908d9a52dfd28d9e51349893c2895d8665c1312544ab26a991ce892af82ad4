@@ -1,0 +1,224 @@
+I"�#<p>Block 是开发过程中常用便捷的回调方式，那么block底层是怎么实现的呢？为什么会造成循环引用？下面将会解答上述问题。</p>
+
+<h3 id="一block本质">一、Block本质</h3>
+
+<p><strong>先看一个简单的Block调用</strong></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>int main(){
+    int age = 0;
+    void (^block)(void) = ^{
+        NSLog(@"age is %d", age);
+    };
+    block();
+    return 0;
+}
+</code></pre></div></div>
+
+<p><strong>将Objective-C代码转换为C\C++代码</strong></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 在终端输入一下命令
+xcrun  -sdk  iphoneos  clang  -arch  arm64  -rewrite-objc  OC源文件  -o  输出的CPP文件
+</code></pre></div></div>
+
+<p><strong>查看Block源码</strong></p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>struct __block_impl {
+  void *isa;      //isa指针，所以说Block是对象
+  int Flags;
+  int Reserved;
+  void *FuncPtr;  //函数指针
+};
+
+struct __main_block_impl_0 {
+  struct __block_impl impl;
+  struct __main_block_desc_0* Desc;
+  int age;
+  // 构造函数（类似于OC的init方法），返回结构体对象
+  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, int _age, int flags=0) : age(_age) {
+    impl.isa = &amp;_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+
+static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+  int age = __cself-&gt;age; // bound by copy
+
+        NSLog((NSString *)&amp;__NSConstantStringImpl__var_folders_sx_ygl_c8ln07jdwrz6w5rgbq8m0000gn_T_blcok_8142ea_mi_0, age);
+}
+
+static struct __main_block_desc_0 {
+  size_t reserved;
+  size_t Block_size;
+} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0)};
+
+int main(){
+    int age = 0;
+    // 定义block
+    void (*block)(void) = ((void (*)())&amp;__main_block_impl_0((void *)__main_block_func_0, &amp;__main_block_desc_0_DATA, age));
+    // 执行block
+    ((void (*)(__block_impl *))((__block_impl *)block)-&gt;FuncPtr)((__block_impl *)block);
+    return 0;
+}
+</code></pre></div></div>
+
+<p>从以上源码可看出：</p>
+
+<ul>
+  <li>Block内部有个isa指针，所以它本质上也是一个OC对象。</li>
+  <li>Block是封装了函数调用以及函数调用环境的OC对象。</li>
+  <li>Block是封装函数及其上下文的OC对象。</li>
+</ul>
+
+<h3 id="二block捕获变量">二、Block捕获变量</h3>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>int global = 30;
+
+int main(){
+    auto int age = 10;
+    static int num = 20;
+    void (^block)(void) = ^{
+        NSLog(@"age is %d, num is %d, global is %d", age, num, global);
+    };
+    age = 15;
+    num = 25;
+    global = 35;
+    block();
+    return 0;
+}
+
+// age is 10, num is 25, global is 35
+</code></pre></div></div>
+
+<p>转换成.cpp的源码:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>int global = 30;
+
+static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+  int age = __cself-&gt;age; // bound by copy
+  int *num = __cself-&gt;num; // bound by copy
+
+        NSLog((NSString *)&amp;__NSConstantStringImpl__var_folders_sx_ygl_c8ln07jdwrz6w5rgbq8m0000gn_T_main_76bced_mi_0, age, (*num), global);
+    }
+
+int main() {
+    auto int age = 10;
+    static int num = 20;
+    void (*block)(void) = ((void (*)())&amp;__main_block_impl_0((void *)__main_block_func_0, &amp;__main_block_desc_0_DATA, age, &amp;num));
+    age = 15;
+    num = 25;
+    global = 35;
+    ((void (*)(__block_impl *))((__block_impl *)block)-&gt;FuncPtr)((__block_impl *)block);
+    return 0;
+}
+</code></pre></div></div>
+
+<p>原因：<strong>为了保证block内部能够正常访问外部的变量，block有个变量捕获机制；auto变量age的block访问方式是值传递，static变量num的block访问方式是指针传递，block不需要对全局变量捕获，都是直接采用取全局变量的值</strong>。</p>
+
+<p>Block里访问self是否会捕获？
+<strong>会，self是当调用block函数的参数，参数是局部变量，self指向调用者；</strong></p>
+
+<p>Block里访问成员变量是否会捕获？
+**会，成员变量的访问其实是<code class="highlighter-rouge">self-&gt;xx</code>，先捕获self，再通过self访问里面的成员变量 **</p>
+
+<h3 id="三block类型">三、Block类型</h3>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>int main() {
+    void (^global_block)(void) = ^{
+        NSLog(@"global_block");
+    };
+    NSLog(@"global_block: %@ -&gt; %@ -&gt; %@ -&gt; %@",[global_block class], [[global_block class] superclass], [[[global_block class] superclass] superclass], [[[[[global_block class] superclass] superclass] superclass] superclass]);
+    
+    __block int age = 1;
+    void (^stack_block)(void) = ^{
+        NSLog(@"stack_block %d", age++);
+    };
+    NSLog(@"stack_block: %@ -&gt; %@ -&gt; %@ -&gt; %@",[stack_block class], [[stack_block class] superclass], [[[stack_block class] superclass] superclass], [[[[[stack_block class] superclass] superclass] superclass] superclass]);
+
+    void (^malloc_block)(void) = [stack_block copy];
+    NSLog(@"malloc_block: %@ -&gt; %@ -&gt; %@ -&gt; %@",[malloc_block class], [[malloc_block class] superclass], [[[malloc_block class] superclass] superclass], [[[[[malloc_block class] superclass] superclass] superclass] superclass]);
+}
+
+MRC输出日志：
+global_block: __NSGlobalBlock__ -&gt; __NSGlobalBlock -&gt; NSBlock -&gt; (null)
+stack_block: __NSStackBlock__ -&gt; __NSStackBlock -&gt; NSBlock -&gt; (null)
+malloc_block: __NSMallocBlock__ -&gt; __NSMallocBlock -&gt; NSBlock -&gt; (null)
+
+ARC输出日志：
+global_block: __NSGlobalBlock__ -&gt; __NSGlobalBlock -&gt; NSBlock -&gt; (null)
+stack_block: __NSMallocBlock__ -&gt; __NSMallocBlock -&gt; NSBlock -&gt; (null)
+malloc_block: __NSMallocBlock__ -&gt; __NSMallocBlock -&gt; NSBlock -&gt; (null)
+
+在ARC下，编译器做了很多的优化，往往看不到本质，上面的代码输出结果找不到__NSStackBlock__，因为编译器对__NSStackBlock__自动进行了copy操作。
+改为MRC方法： Build Settings 里面的Automatic Reference Counting改为NO。
+</code></pre></div></div>
+
+<p>Block的类型，取决于isa指针，可以通过调用class方法或者isa指针查看具体类型，最终都是继承自NSBlock类型</p>
+
+<ul>
+  <li><code class="highlighter-rouge">__NSGlobalBlock __ （ _NSConcreteGlobalBlock ）</code></li>
+  <li><code class="highlighter-rouge">__NSStackBlock __ （ _NSConcreteStackBlock ）</code></li>
+  <li><code class="highlighter-rouge">__NSMallocBlock __ （ _NSConcreteMallocBlock ）</code></li>
+</ul>
+
+<p>其中三种不同的类型和环境对应如下</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">block类型</th>
+      <th style="text-align: center">环境</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="highlighter-rouge">__NSGlobalBlock__</code></td>
+      <td style="text-align: center">没有访问auto变量</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="highlighter-rouge">__NSStackBlock__</code></td>
+      <td style="text-align: center">访问了auto变量</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="highlighter-rouge">__NSMallocBlock__</code></td>
+      <td style="text-align: center"><code class="highlighter-rouge">__NSStackBlock__</code>调用了copy</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>其在内存中的分配如下对应：</p>
+
+<p><img src="https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/block-memory.png" alt="block-memory" /></p>
+
+<p>对每种类型block调用copy操作后是什么结果？</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>int main() {
+    void (^global_block_copy)(void) = [^{
+        NSLog(@"global_block_copy");
+    } copy];
+    NSLog(@"global_block_copy: %@ -&gt; %lu",[global_block_copy class], (unsigned long)[global_block_copy retainCount]);
+    
+    __block int age = 1;
+    void (^stack_block_copy)(void) = [^{
+        NSLog(@"stack_block_copy: %d", age++);
+    } copy];
+    NSLog(@"stack_block_copy: %@ -&gt; %lu",[stack_block_copy class], (unsigned long)[stack_block_copy retainCount]);
+
+    void (^malloc_block_copy)(void) = [stack_block_copy copy];
+    NSLog(@"malloc_block_copy: %@ -&gt; %lu",[malloc_block_copy class], (unsigned long)[malloc_block_copy retainCount]);
+}
+
+输出日志：
+
+</code></pre></div></div>
+
+<p>总结：</p>
+
+<ul>
+  <li><code class="highlighter-rouge">__NSGlobalBlock __</code> 调用copy操作后，什么也不做</li>
+  <li><code class="highlighter-rouge">__NSStackBlock __</code> 调用copy操作后，复制效果是：从栈复制到堆；副本存储位置是<strong>堆</strong></li>
+  <li><code class="highlighter-rouge">__NSMallocBlock __</code> 调用copy操作后，复制效果是：引用计数增加；副本存储位置是<strong>堆</strong></li>
+</ul>
+
+:ET
