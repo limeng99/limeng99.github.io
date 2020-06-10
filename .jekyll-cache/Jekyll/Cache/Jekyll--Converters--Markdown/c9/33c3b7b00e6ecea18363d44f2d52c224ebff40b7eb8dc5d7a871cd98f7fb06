@@ -1,0 +1,28 @@
+I"$<p>在性能优化中一个最具参考价值的属性是FPS:Frames Per Second，其实就是屏幕刷新率，苹果的iphone推荐的刷新率是60Hz，也就是说GPU每秒钟刷新屏幕60次，这每刷新一次就是一帧frame，FPS也就是每秒钟刷新多少帧画面。当页面在执行动画或者滑动的时候，FPS值的大小体现了页面的流畅程度高低，当低于45的时候卡顿会比较明显。</p>
+
+<h3 id="一入门级">一、入门级</h3>
+
+<h5 id="11-用arc管理内存">1.1 用ARC管理内存</h5>
+
+<p>ARC (<code class="highlighter-rouge">Automatic Reference Counting</code>, 自动引用计数) 和iOS5一起发布，它避免了最常见的也就是经常是由于我们忘记释放内存所造成的内存泄露。它自动为你管理retain和release的过程，所以你就不必去手动干预了。忘掉代码段结尾的release简直像记得吃饭一样简单。而ARC会自动在底层为你做这些工作。除了帮你避免内存泄露，ARC还可以帮你提高性能，它能保证释放掉不再需要的对象的内存。</p>
+
+<h5 id="12-使用-reuseidentifier">1.2 使用 reuseIdentifier</h5>
+
+<p>为了性能最优化，<code class="highlighter-rouge">UITableView</code>用<code class="highlighter-rouge">tableView:cellForRowAtIndexPath:</code>为rows分配cells的时候，它的数据应该重用<code class="highlighter-rouge">UITableViewCell</code>。一个<code class="highlighter-rouge">UITableView</code>维持一个队列的数据可重用的<code class="highlighter-rouge">UITableViewCell</code>对象。<code class="highlighter-rouge">UICollectionView</code>使用<code class="highlighter-rouge">UICollectionViewCell</code>同样使用reuseIdentifier，同<code class="highlighter-rouge">UICollectionView</code>的组视图header和footer也需要使用reuseIdentifier进行重用处理，以提高性能；</p>
+
+<h5 id="13-减少透明-view">1.3 减少透明 view</h5>
+
+<p>使用透明view会引起Blending，在iOS的图形处理中，Blending主要指的是混合像素颜色的计算。最直观的例子就是，我们把两个图层叠加在一起，如果第一个图层的透明的，则最终像素的颜色计算需要将第二个图层也考虑进来。这一过程即为Blending。</p>
+
+<p>导致Blending的原因：<code class="highlighter-rouge">UIView</code>的alpha&lt;1；<code class="highlighter-rouge">UIImageView</code>的image含有alpha channel (即使<code class="highlighter-rouge">UIImageView</code>的alpha是1，但只要image含有透明通道，则仍会导致Blending)。</p>
+
+<p>为什么Blending会导致性能的损失？
+原因是很直观的，如果一个图层是不透明的，则系统直接显示该图层的颜色即可。而如果图层是透明的，则会引起更多的计算，因为需要把另一个的图层也包括进来，进行混合后的颜色计算。</p>
+
+<p><code class="highlighter-rouge">UIView</code>的<code class="highlighter-rouge">opaque</code>属性设置为YES，减少性能消耗，因为GPU将不会做任何合成，而是简单从这个层拷贝。</p>
+
+<h5 id="14-避免过于庞大的xib">1.4 避免过于庞大的XIB</h5>
+
+<p>如果你不得不XIB的话，使他们尽量简单。尝试为每个Controller配置一个单独的XIB，尽可能把一个View Controller的view层次结构分散到单独的XIB中去。</p>
+
+:ET

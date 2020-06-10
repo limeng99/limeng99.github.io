@@ -1,0 +1,21 @@
+I">
+<ul>
+  <li><a href="#1-用arc管理内存">1. 用ARC管理内存</a></li>
+  <li><a href="#2-使用-reuseidentifier">2. 使用 reuseIdentifier</a></li>
+  <li><a href="#3-设置view为不透明">3. 设置View为不透明</a></li>
+  <li><a href="#4-避免使用臃肿的-xib-文件">4. 避免使用臃肿的 Xib 文件</a></li>
+  <li><a href="#5-不要阻塞主线程">5. 不要阻塞主线程</a></li>
+  <li><a href="#6-使用尺寸匹配的uiimage">6. 使用尺寸匹配的UIImage</a></li>
+  <li><a href="#7-选择合适的容器">7. 选择合适的容器</a></li>
+  <li><a href="#8-启用gzip数据压缩">8. 启用GZIP数据压缩</a></li>
+  <li><a href="#9-懒加载视图--视图隐藏">9. 懒加载视图 / 视图隐藏</a></li>
+  <li><a href="#10-缓存cache">10. 缓存Cache</a></li>
+  <li><a href="#11-处理-memory-warning">11. 处理 Memory Warning</a></li>
+  <li><a href="#12-复用高开销对象">12. 复用高开销对象</a></li>
+  <li><a href="#13-选择正确的网络返回数据格式">13. 选择正确的网络返回数据格式</a></li>
+  <li><a href="#14-合理设置背景图片">14. 合理设置背景图片</a></li>
+  <li><a href="#15-减少离屏渲染">15. 减少离屏渲染</a></li>
+  <li><a href="#16-光栅化">16. 光栅化</a></li>
+  <li><a href="#17-优化-uitableview">17. 优化 UITableView</a></li>
+</ul>
+:ET

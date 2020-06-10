@@ -1,0 +1,307 @@
+I"L<p>在性能优化中一个最具参考价值的属性是FPS:Frames Per Second，其实就是屏幕刷新率，苹果的iphone推荐的刷新率是60Hz，也就是说GPU每秒钟刷新屏幕60次，这每刷新一次就是一帧frame，FPS也就是每秒钟刷新多少帧画面。当页面在执行动画或者滑动的时候，FPS值的大小体现了页面的流畅程度高低，当低于45的时候卡顿会比较明显。</p>
+
+<h4 id="1-用arc管理内存">1. 用ARC管理内存</h4>
+
+<p>ARC (<code class="highlighter-rouge">Automatic Reference Counting</code>, 自动引用计数) 和iOS5一起发布，它避免了最常见的也就是经常是由于我们忘记释放内存所造成的内存泄露。它自动为你管理retain和release的过程，所以你就不必去手动干预了。忘掉代码段结尾的release简直像记得吃饭一样简单。而ARC会自动在底层为你做这些工作。除了帮你避免内存泄露，ARC还可以帮你提高性能，它能保证释放掉不再需要的对象的内存。</p>
+
+<h4 id="2-使用-reuseidentifier">2. 使用 reuseIdentifier</h4>
+
+<p>为了性能最优化，<code class="highlighter-rouge">UITableView</code>用<code class="highlighter-rouge">tableView:cellForRowAtIndexPath:</code>为rows分配cells的时候，它的数据应该重用<code class="highlighter-rouge">UITableViewCell</code>。一个<code class="highlighter-rouge">UITableView</code>维持一个队列的数据可重用的<code class="highlighter-rouge">UITableViewCell</code>对象。<code class="highlighter-rouge">UICollectionView</code>使用<code class="highlighter-rouge">UICollectionViewCell</code>同样使用reuseIdentifier。同<code class="highlighter-rouge">UICollectionView</code>及<code class="highlighter-rouge">UITableView</code>的组视图header和footer也需要使用reuseIdentifier进行重用处理，以提高性能；</p>
+
+<h4 id="3-设置view为不透明">3. 设置View为不透明</h4>
+
+<p>使用透明view会引起Blending，在iOS的图形处理中，Blending主要指的是混合像素颜色的计算。最直观的例子就是，我们把两个图层叠加在一起，如果第一个图层的透明的，则最终像素的颜色计算需要将第二个图层也考虑进来。这一过程即为Blending。</p>
+
+<p>导致Blending的原因：<code class="highlighter-rouge">UIView</code>的alpha&lt;1；<code class="highlighter-rouge">UIImageView</code>的image含有alpha channel (即使<code class="highlighter-rouge">UIImageView</code>的alpha是1，但只要image含有透明通道，则仍会导致Blending)。</p>
+
+<p>为什么Blending会导致性能的损失？
+原因是很直观的，如果一个图层是不透明的，则系统直接显示该图层的颜色即可。而如果图层是透明的，则会引起更多的计算，因为需要把另一个的图层也包括进来，进行混合后的颜色计算。</p>
+
+<p><code class="highlighter-rouge">UIView</code>的<code class="highlighter-rouge">opaque</code>属性设置为YES，减少性能消耗，因为GPU将不会做任何合成，而是简单从这个层拷贝。</p>
+
+<h4 id="4-避免使用臃肿的-xib-文件">4. 避免使用臃肿的 Xib 文件</h4>
+
+<p>当加载一个 Xib 时，它所有的内容都会被加载，如果这个 Xib 中有的View 你不会马上用到，加载就是浪费资源。而加载 StoryBoard 时，并不会把所有的ViewController 都加载，只会按需加载。</p>
+
+<h4 id="5-不要阻塞主线程">5. 不要阻塞主线程</h4>
+
+<p><code class="highlighter-rouge">UIKit</code>会把它所有的工作放在主线程执行，比如：绘制界面，管理手势，响应输入等。当把所有代码逻辑都放在主线程时，有可能因为耗时太长而卡住主线程造成程序无法响应，流畅性差等问题。所以一些 I/O 操作，网络数据解析都需要异步在非主线程处理。</p>
+
+<h4 id="6-使用尺寸匹配的uiimage">6. 使用尺寸匹配的UIImage</h4>
+
+<p>当从 <code class="highlighter-rouge">App bundle</code> 中加载图片到 <code class="highlighter-rouge">UIImageView</code> 时，最好确保图片的尺寸和 <code class="highlighter-rouge">UIImageView</code> 相对应。否则会使<code class="highlighter-rouge">UIImageView</code> 对图片进行拉伸，这样会影响性能。如果图片时从网络加载，需要手动进行 scale。在<code class="highlighter-rouge">UIImageView</code> 中使用resize 后的图片。</p>
+
+<h4 id="7-选择合适的容器">7. 选择合适的容器</h4>
+
+<p>在使用 <code class="highlighter-rouge">NSArray / NSDictionary / NSSet</code>时，了解他们的特点便于在合适的时机选择他们。Apple的 <a href="https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Collections/Collections.html">Collections Programming Topics</a> 文档详尽介绍了可用的容器间的差别和你该在哪些场景中使用它们。</p>
+
+<p><code class="highlighter-rouge">NSSet</code>和<code class="highlighter-rouge">NSArray</code>都是对象容器，用于存储对象，属于集合；<code class="highlighter-rouge">NSSet </code>与 <code class="highlighter-rouge">NSMutableSet</code>是无序的集合，在内存中存储方式是不连续,<code class="highlighter-rouge">NSArray</code>是有序的集合，在内存中存储位置是连续的。</p>
+
+<p><code class="highlighter-rouge">NSArray / NSMutableArray</code></p>
+
+<ul>
+  <li>
+    <p><code class="highlighter-rouge">containsObject; indexOfObject; removeObject</code>均会遍历元素查看是否匹配，复杂度等于或小于 O(n)</p>
+  </li>
+  <li>
+    <p><code class="highlighter-rouge">objectAtIndex；firstObject；lastObject; addObject; removeLastObject</code>这些只针对栈顶，栈底的操作时间复杂度都是 O(1)</p>
+  </li>
+  <li>
+    <p><code class="highlighter-rouge">indexOfObject:inSortedRange:options:usingComparator:</code>使用的是二分查找，时间复杂度是O(log n)</p>
+  </li>
+</ul>
+
+<p><code class="highlighter-rouge">NSSet / NSMutableSet / NSCountedSet</code></p>
+
+<ul>
+  <li>
+    <p>集合类型是无序并且没有重复元素的。这样可以使用hash table 进行快速的操作。</p>
+  </li>
+  <li>
+    <p><code class="highlighter-rouge">addObject; removeObject; containsObject</code>都是时间复杂度按照 O(1) 来的。需要注意的是将数组转成Set 时，会将重复元素合并为一个，并且失去排序。</p>
+  </li>
+</ul>
+
+<p><code class="highlighter-rouge">NSDictionary / NSMutableDictionary</code></p>
+
+<ul>
+  <li>和Set 一样都可以使用 hash table ，多了键值对应。添加和删除元素都是 O(1)。</li>
+</ul>
+
+<h4 id="8-启用gzip数据压缩">8. 启用GZIP数据压缩</h4>
+
+<p>在网络请求的数据量较大时，可以将数据进行压缩再进行传输。可以降低延迟，缩短网络交互时间。</p>
+
+<h4 id="9-懒加载视图--视图隐藏">9. 懒加载视图 / 视图隐藏</h4>
+
+<p>展现视图的两种形式一种是懒加载，当用到的时候去创建并展现给用户，另外一种提前分配内存创建出视图，不用的时候将其隐藏，等用到的时候将其透明度变为1，两种方案各有利弊。懒加载更合理的使用内存，视图隐藏让视图的展现更迅速。在选择时需要权衡两者利弊做出最优选择。</p>
+
+<h4 id="10-缓存cache">10. 缓存Cache</h4>
+
+<p>开发需要秉承一个原则，对于一些更新频率低，访问频率高的内容进行缓存，例如：</p>
+
+<ul>
+  <li>服务器响应数据</li>
+  <li>图片资源</li>
+  <li>计算值 （如UITableView 的 row height）</li>
+</ul>
+
+<h4 id="11-处理-memory-warning">11. 处理 Memory Warning</h4>
+
+<p>处理 Memory Warning 的几种方式：</p>
+
+<ul>
+  <li>
+    <p>在 <code class="highlighter-rouge">AppDelegate </code> 中实现 <code class="highlighter-rouge">- [AppDelegate applicationDidReceiveMemoryWarning:]</code>代理方法。</p>
+  </li>
+  <li>
+    <p>在 <code class="highlighter-rouge">UIViewController</code>中重载 <code class="highlighter-rouge">didReceiveMemoryWarning</code>方法。</p>
+  </li>
+  <li>
+    <p>监听 <code class="highlighter-rouge">UIApplicationDidReceiveMemoryWarningNotification</code>通知。</p>
+  </li>
+</ul>
+
+<p>当通过这些方式监听到内存警告时，你需要马上释放掉不需要的内存从而避免程序被系统杀掉。</p>
+
+<p>比如，在一个 UIViewController 中，你可以清除那些当前不显示的 View，同时可以清除这些 View 对应的内存中的数据，而有图片缓存机制的话也可以在这时候释放掉不显示在屏幕上的图片资源。</p>
+
+<p>但是需要注意的是，你这时清除的数据，必须是可以在重新获取到的，否则可能因为必要数据为空，造成程序出错。在开发的时候，可以使用 iOS Simulator 的 Simulate memory warning 的功能来测试你处理内存警告的代码。</p>
+
+<h4 id="12-复用高开销对象">12. 复用高开销对象</h4>
+
+<p>高开销对象，顾名思义就是初始化很耗性能的对象。比如：<code class="highlighter-rouge">NSDateFormatter</code>, <code class="highlighter-rouge">NSCalendar</code>.为了避免频繁创建，我们可以使用一个全局单例强引用着这个对象，保证整个App 的生命周期只被初始化一次。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>- (NSDateFormatter *)dateFormatter {
+    static NSDateFormatter *dateFormatter;
+    static dispatch_once_t onceToken;
+    dispatch_once(&amp;onceToken, ^{
+        dateFormatter = [[NSDateFormatter alloc] init];
+        [dateFormatter setDateFormat:@"yyyy-MM-dd a HH:mm:ss EEEE"];
+    });
+    return dateFormatter;
+}
+</code></pre></div></div>
+
+<p>设置 <code class="highlighter-rouge">NSDateFormatter</code> 的 date format 跟创建一个新的 <code class="highlighter-rouge">NSDateFormatter</code> 对象一样慢，因此当你的程序中要用到多种格式的 date format，而每种又会用到多次的时候，你可以尝试为每种 date format 创建一个可复用的 <code class="highlighter-rouge">NSDateFormatter</code> 对象来提供程序的性能。</p>
+
+<h4 id="13-选择正确的网络返回数据格式">13. 选择正确的网络返回数据格式</h4>
+
+<p>通常用到的有两种: JSON 和 XML。</p>
+
+<p>JSON 优点：能够更快的被解析；在承载相同数据时，体积比XML更小，传输的数据量更小。</p>
+
+<p>JSON 缺点：需要整个JSON数据全部加载完成后才能开始解析。</p>
+
+<p>而XML的优缺点恰好相反。解析数据不需要全部读取完才解析，可以变加载边解析，这样在处理大数据集时可以有效提高性能。 选择哪种格式取决于应用场景。</p>
+
+<h4 id="14-合理设置背景图片">14. 合理设置背景图片</h4>
+
+<p>为一个View 设置背景图，我们想到的方案有两种</p>
+
+<ul>
+  <li>
+    <p>为视图加一个 <code class="highlighter-rouge">UIImageView</code> 设置 <code class="highlighter-rouge">UIImage</code> 作为背景</p>
+  </li>
+  <li>
+    <p>通过 <code class="highlighter-rouge">[UIColor colorWithPatternImage:&lt;#(nonnull UIImage *)#&gt;]</code>将一张图转化为 <code class="highlighter-rouge">UIColor</code>, 直接为View 设置 backgroundColor。</p>
+  </li>
+</ul>
+
+<p>两种方案各有优缺点：若使用一个全尺寸图片作为背景图使用 <code class="highlighter-rouge">UIImageView</code> 会节省内存。 当你计划采用一个小块的模板样式图片，就像贴瓷砖那样来重复填充整个背景时，你应该用 <code class="highlighter-rouge">[UIColor colorWithPatternImage:&lt;#(nonnull UIImage *)#&gt;]</code>这个方法，因为这时它能够绘制的更快，并且不会用到太多的内存。</p>
+
+<h4 id="15-减少离屏渲染">15. 减少离屏渲染</h4>
+
+<p>离屏渲染：GPU在当前屏幕缓冲区以外新开辟一个缓冲区进行渲染操作。 离屏渲染需要多次切换上下文环境：先是从当前屏幕（On-Screen）切换到离屏（Off-Screen）；等到离屏渲染结束以后，将离屏缓冲区的渲染结果显示到屏幕上又需要将上下文环境从离屏切换到当前屏幕，而上下文环境的切换是一项高开销的动作。</p>
+
+<p>设置如下属性均会造成离屏渲染：</p>
+
+<ul>
+  <li>
+    <p>shouldRasterize（光栅化）</p>
+  </li>
+  <li>
+    <p>masks（遮罩）</p>
+  </li>
+  <li>
+    <p>shadows（阴影）</p>
+  </li>
+  <li>
+    <p>edge antialiasing（抗锯齿）</p>
+  </li>
+  <li>
+    <p>group opacity（不透明）</p>
+  </li>
+  <li>
+    <p>复杂形状设置圆角等</p>
+  </li>
+  <li>
+    <p>渐变</p>
+  </li>
+</ul>
+
+<p>例如给一个View设置阴影，通常我们会使用这种方式：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>imageView.layer.shadowOffset = CGSizeMake(5.0f, 5.0f);
+imageView.layer.shadowRadius = 5.0f;
+imageView.layer.shadowOpacity = 0.6;
+</code></pre></div></div>
+
+<p>这种方式会触发离屏渲染，造成不必要的内存开销，我们完全可以使用如下方式代替：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>imageView.layer.shadowPath = [[UIBezierPath bezierPathWithRect:CGRectMake(imageView.bounds.origin.x+5, imageView.bounds.origin.y+5, imageView.bounds.size.width, imageView.bounds.size.height)] CGPath];
+imageView.layer.shadowOpacity = 0.6;
+</code></pre></div></div>
+
+<h4 id="16-光栅化">16. 光栅化</h4>
+
+<p><code class="highlighter-rouge">CALayer</code> 有一个属性是 <code class="highlighter-rouge">shouldRasterize</code> 通过设置这个属性为 YES 可以将图层绘制到一个屏幕外的图像，然后这个图像将会被缓存起来并绘制到实际图层的 contents 和子图层，如果很很多的子图层或者有复杂的效果应用，这样做就会比重绘所有事务的所有帧来更加高效。但是光栅化原始图像需要时间，而且会消耗额外的内存。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>cell.layer.shouldRasterize = YES;
+cell.layer.rasterizationScale = [[UIScreen mainScreen] scale];
+</code></pre></div></div>
+
+<p>使用光栅化的一个前提是视图不会频繁变化，若一个频繁变化的视图，例如 排版多变，高度不同的Cell, 光栅化的意义就不大了，反而造成必要的内存损耗。</p>
+
+<h4 id="17-优化-uitableview">17. 优化 UITableView</h4>
+
+<ul>
+  <li>
+    <p>通过正确的设置 reuseIdentifier 来重用 Cell。</p>
+  </li>
+  <li>
+    <p>尽量减少不必要的透明 View。</p>
+  </li>
+  <li>
+    <p>尽量避免渐变效果、图片拉伸和离屏渲染。</p>
+  </li>
+  <li>
+    <p>当不同的行的高度不一样时，尽量缓存它们的高度值。</p>
+  </li>
+  <li>
+    <p>如果 Cell 展示的内容来自网络，确保用异步加载的方式来获取数据，并且缓存服务器的 response。</p>
+  </li>
+  <li>
+    <p>使用 shadowPath 来设置阴影效果。</p>
+  </li>
+  <li>
+    <p>尽量减少 subview 的数量，对于 subview 较多并且样式多变的 Cell，可以考虑用异步绘制或重写 drawRect。</p>
+  </li>
+  <li>
+    <p>尽量优化 <code class="highlighter-rouge">- [UITableView tableView:cellForRowAtIndexPath:]</code> 方法中的处理逻辑，如果确实要做一些处理，可以考虑做一次，缓存结果。</p>
+  </li>
+  <li>
+    <p>选择合适的数据结构来承载数据，不同的数据结构对不同操作的开销是存在差异的。</p>
+  </li>
+  <li>
+    <p>对于 rowHeight、sectionFooterHeight、sectionHeaderHeight 尽量使用常量。</p>
+  </li>
+</ul>
+
+<h4 id="18-选择合适数据存储方式">18. 选择合适数据存储方式</h4>
+
+<p>iOS 中数据存储方案有以下几种：</p>
+
+<ul>
+  <li><code class="highlighter-rouge">NSUserDefaults</code> 只适合用来存小数据。</li>
+  <li><code class="highlighter-rouge">XML、JSON、Plist</code> 等文件。<code class="highlighter-rouge">JSON 和 XML</code> 文件的差异在「13. 选择正确的数据格式」已经说过了。</li>
+  <li>使用 <code class="highlighter-rouge">NSCoding</code> 来存档。<code class="highlighter-rouge">NSCoding</code> 同样是对文件进行读写，所以它也会面临必须加载整个文件才能继续的问题。</li>
+  <li>使用 <code class="highlighter-rouge">SQLite </code>数据库。可以配合<code class="highlighter-rouge">FMDB</code> 使用。数据的相对文件来说还是好处很多的，比如可以按需取数据、不用暴力查找等等。</li>
+  <li>使用 <code class="highlighter-rouge">CoreData</code>。 Apple 提供的对于<code class="highlighter-rouge">SQLite</code> 的封装，性能不如使用原生 <code class="highlighter-rouge">SQLite</code>, 不推荐使用。</li>
+</ul>
+
+<h4 id="19-减少应用启动时间">19. 减少应用启动时间</h4>
+
+<p><a href="https://limeng99.club/learning/2020/01/03/APP%E5%90%AF%E5%8A%A8%E6%B5%81%E7%A8%8B%E4%B8%8E%E4%BC%98%E5%8C%96.html">APP启动流程与优化</a> 有详细描述</p>
+
+<h4 id="20-使用-autorelease-pool">20. 使用 Autorelease Pool</h4>
+
+<p>当需要在代码中创建许多临时对象时，你会发现内存消耗激增直到这些对象被释放，一个问题是这些内存只会到 <code class="highlighter-rouge">UIKit</code> 销毁了它对应的 <code class="highlighter-rouge">Autorelease Pool</code> 后才会被释放，这就意味着这些内存不必要地会空占一些时间。这时候就是我们显式的使用 <code class="highlighter-rouge">Autorelease Pool</code> 的时候了，一个示例如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>//一个很大数组
+NSArray *urls = &lt;# An array of file URLs #&gt;; 
+for (NSURL *url in urls) {
+    @autoreleasepool {
+        NSError *error;
+        NSString *fileContents = [NSString stringWithContentsOfURL:url
+                                         encoding:NSUTF8StringEncoding error:&amp;error];
+        /* Process the string, creating and autoreleasing more objects. */
+    }
+}
+</code></pre></div></div>
+
+<p>添加 <code class="highlighter-rouge">Autorelease Pool</code> 会在每一次循环中释放掉临时对象，提高性能。</p>
+
+<h4 id="21-合理选择-imagenamed和-imagewithcontentsoffile">21. 合理选择 imageNamed和 imageWithContentsOfFile</h4>
+
+<p><code class="highlighter-rouge">imageNamed</code>和 <code class="highlighter-rouge">imageWithContentsOfFile</code>区别：</p>
+
+<ul>
+  <li>
+    <p><code class="highlighter-rouge">imageNamed</code>会对图片进行缓存，适合多次使用某张图片。</p>
+  </li>
+  <li>
+    <p><code class="highlighter-rouge">imageWithContentsOfFile</code>从bundle中加载图片文件，不会进行缓存，适用于加载一张较大的并且只使用一次的图片，例如引导图等。</p>
+  </li>
+</ul>
+
+<h4 id="22-io-性能优化">22. I/O 性能优化</h4>
+
+<p>I/O 操作是性能消耗大户，任何的I/O操作都会使低功耗状态被打破。所以减少 I/O 操作次数是性能优化关键。如下是优化的一些方法:</p>
+
+<ul>
+  <li>
+    <p>将零碎的内容作为一个整体进行写入。</p>
+  </li>
+  <li>
+    <p>使用合适的 I/O 操作 API。</p>
+  </li>
+  <li>
+    <p>使用合适的线程。</p>
+  </li>
+  <li>
+    <p>使用 NSCache 做缓存减少 I/O 次数。</p>
+  </li>
+</ul>
+
+:ET
