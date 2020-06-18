@@ -142,7 +142,7 @@ typedef struct objc_object *id;
 
 #### 元类(Meta Class)
 
-![runtime-meta](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/runtime-meta.png)
+![runtime-meta](https://github.com/limeng99/limeng99.github.io/blob/master/assets/img/screenshots/runtime-meta.png)
 
 通过上图我们可以看出整个体系构成了一个自闭环，`struct objc_object`结构体`实例`它的`isa`指针指向类对象；
 类对象的`isa`指针指向了元类，`super_class`指针指向父类的类对象；
@@ -258,7 +258,7 @@ instanceProperties：表示Category里所有的properties，这就是我们可�
 
 上文中介绍了进行一次消息发送会在相关类对象中搜索方法列表，如果找不到则会沿着继承树向上一直搜索直到继承树的根部(通常为`NSObject`)，如果还是找不到会怎么样呢？接下来会逐一介绍消息转发的流程，先看下图：
 
-![runtime-forward](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/runtime-forward.png)
+![runtime-forward](https://github.com/limeng99/limeng99.github.io/blob/master/assets/img/screenshots/runtime-forward.png)
 
 消息转发三个步骤：动态方法解析；备用接收者；完整消息转发。
 
