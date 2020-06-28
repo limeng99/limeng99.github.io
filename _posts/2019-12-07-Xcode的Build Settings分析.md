@@ -13,7 +13,7 @@ typora-root-url: ../assets
 
 ### 1. Architectures
 
-![xcode-architectures](https://github.com/limeng99/limeng99.github.io/blob/master/assets/img/screenshots/xcode-architectures.png)
+![xcode-architectures](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-architectures.png)
 
 ```
 Additional SDKs : 在编译时要附加的SDK。
@@ -52,7 +52,7 @@ armv7：iPhone4｜iPhone4S｜iPad｜iPad2｜iPad3(The New iPad)｜iPad mini｜iP
 
 ### 2. Assets
 
-![xcode-assets](https://github.com/limeng99/limeng99.github.io/blob/master/assets/img/screenshots/xcode-assets.png)
+![xcode-assets](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-assets.png)
 
 ```
 Asset Pack Manifest URL Prefix : 资源包清单的下载路径URL前缀
@@ -64,7 +64,7 @@ On Demand Resources Prefetch Order : 按需加载资源时预加载的标签顺�
 
 ### 3. Build Locations
 
-![xcode-locations](https://github.com/limeng99/limeng99.github.io/blob/master/assets/img/screenshots/xcode-locations.png)
+![xcode-locations](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-locations.png)
 
 ```
 Build Products Paths : 产品文件和编译中间文件的根目录。产品文件和编译时临时文件都将放在这个目录的子目录中。
@@ -77,7 +77,7 @@ Per-configuration Build Products Path : 当前编译设置下的产品存放位�
 
 ### 4. Build Options
 
-![xcode-options](https://github.com/limeng99/limeng99.github.io/blob/master/assets/img/screenshots/xcode-options.png)
+![xcode-options](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-options.png)
 
 ```
 Always Embed Swift Standard Libraries : 始终嵌入swift标准库。对于未使用swift代码的情况可以设置为NO。
@@ -121,7 +121,7 @@ Validate Built Product : 这个选项决定了是否在编译的时候进行验�
 
 ### 5. Search Paths
 
-![xcode-searchpaths](https://github.com/limeng99/limeng99.github.io/blob/master/assets/img/screenshots/xcode-searchpaths.png)
+![xcode-searchpaths](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-searchpaths.png)
 
 ```
 Always Search User Paths : 是否搜索用户指定的路径，默认No。
@@ -134,7 +134,7 @@ User Header Search Paths : 设置头文件搜索路径，这个只有当Always S
 ```
 
 ### 6. Packaging
-![xcode-packasing](https://github.com/limeng99/limeng99.github.io/blob/master/assets/img/screenshots/xcode-packaging.png)
+![xcode-packasing](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-packaging.png)
 
 ```
 Defines Module : 是否定义模块。默认App类的工程为No，Framwork工程默认为Yes。
@@ -153,7 +153,7 @@ Wrapper Extension : 打包的扩展名，默认app。
 
 ### 7. Signing
 
-![xcode-signing](https://github.com/limeng99/limeng99.github.io/blob/master/assets/img/screenshots/xcode-signing.png)
+![xcode-signing](https://raw.githubusercontent.com/limeng99/limeng99.github.io/master/assets/img/screenshots/xcode-signing.png)
 
 ```
 Code Signing Entitlements : 授权机制。在Xcode的capabilities选项卡下选择一些选项后，Xcode就会生成这样一段XML，Xcode会自动生成一个entitlements文件，然后再需要的时候往里面添加条目。当构建整个应用时，这个文件也会提及给codesign作为应用所需要拥有哪些授权的参考。这些授权信息必须都在开发者中心的AppID中启用，并且包含在配置文件中。
