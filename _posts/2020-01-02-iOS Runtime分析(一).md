@@ -540,7 +540,7 @@ typedef OBJC_ENUM(uintptr_t, objc_AssociationPolicy) {
 + (void)load {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        Class class = [self class];
+        Class class = object_getClass(self);
         
         Method originalMethod = class_getClassMethod(class, @selector(imageNamed:));
         Method swizzledMethod = class_getClassMethod(class, @selector(rep_imageNamed:));
