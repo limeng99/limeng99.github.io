@@ -1,0 +1,145 @@
+I"<p>静态分析，是iOS开发者最常用到的一种代码调试技术。一款优秀的静态分析器，能够帮助我们更加全面的发现人工测试中的盲点，提高检查问题的效率，寻找潜在的可用性问题，比如空指针访问、资源和内存泄露等等。</p>
+
+<p>Xcode 自带的静态分析工具 Analyze，通过静态语法分析能够找出在代码层面就能发现的内存泄露问题，还可以通过上下文分析出是否存在变量无用等问题，但是，Analyze 的功能还是有限，还是无法帮助我们在编写代码的阶段发现更多的问题。所以，这才诞生出了功能更全、定制化高、效率高的第三方静态检查工具。比如，OCLint、Infer、Clang静态分析器等。</p>
+
+<p>其中Infer 在准确性、性能效率、规则、扩展性、易用性整体度上的把握是做得最好的，我认为这些是决定静态分析器好不好最重要的几点。所以，比较推荐的是使用 Infer 来进行代码静态分析。</p>
+
+<h4 id="infer安装">Infer安装</h4>
+
+<p>Infer 是 Facebook 出品的工具，可用于代码优化和bug发现。借助这个工具，我们可以对 iOS 和 Android 代码进行检测，发现 bug 和问题，对代码进行优化和bug修复。Infer 是一个静态分析工具，支持 Objective-C，Java，C代码。Infer官网：<a href="https://infer.liaohuqiu.net/docs/getting-started.html">安装教程</a></p>
+
+<p>使用homebrew安装：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>brew install infer
+</code></pre></div></div>
+
+<h4 id="infer示例">Infer示例</h4>
+
+<p>以下是一个简单的 Objective-C 例子：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// Hello.m
+#import &lt;Foundation/Foundation.h&gt;
+
+@interface Hello: NSObject
+@property NSString* s;
+@end
+
+@implementation Hello
+NSString* m() {
+    Hello* hello = nil;
+    return hello-&gt;_s;
+}
+@end
+</code></pre></div></div>
+
+<p>在 <code class="highlighter-rouge">Hello.m</code> 同级目录，运行：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>infer -- clang -c Hello.m
+</code></pre></div></div>
+
+<p>结果如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Capturing in make/cc mode...
+Found 1 source file to analyze in /Users/limengmeng/Desktop/Infer/Infer/infer-out
+
+
+Analysis finished in 3.002ss
+
+Found 3 issues
+
+Hello.m:13: error: NULL_DEREFERENCE
+  pointer `hello` last assigned on line 12 could be null and is dereferenced at line 13, column 12.
+  11.   NSString* m() {
+  12.       Hello* hello = nil;
+  13. &gt;     return hello-&gt;_s;
+  14.   }
+  15.   @end
+
+Hello.m:13: warning: DIRECT_ATOMIC_PROPERTY_ACCESS
+  Direct access to ivar `_s` of an atomic property at line 13, column 12. Accessing an ivar of an atomic property makes the property nonatomic.
+  11.   NSString* m() {
+  12.       Hello* hello = nil;
+  13. &gt;     return hello-&gt;_s;
+  14.   }
+  15.   @end
+
+Hello.m:5: warning: ASSIGN_POINTER_WARNING
+  Property `s` is a pointer type marked with the `assign` attribute at line 5, column 1. Use a different attribute like `strong` or `weak`.
+  3.   @interface Hello : NSObject
+  4.
+  5. &gt; @property NSString* s;
+  6.
+  7.   @end
+
+
+Summary of the reports
+
+               NULL_DEREFERENCE: 1
+  DIRECT_ATOMIC_PROPERTY_ACCESS: 1
+         ASSIGN_POINTER_WARNING: 1
+</code></pre></div></div>
+
+<p>可以看出，我们前面的 <code class="highlighter-rouge">Hello.m</code> 代码里一共有五个问题，其中包括一个错误、两个警告。第一个错误如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Hello.m:13: error: NULL_DEREFERENCE
+  pointer `hello` last assigned on line 12 could be null and is dereferenced at line 13, column 12.
+  11.   NSString* m() {
+  12.       Hello* hello = nil;
+  13. &gt;     return hello-&gt;_s;
+  14.   }
+  15.   @end
+</code></pre></div></div>
+
+<p>这个错误的意思是，hello可能为空，需要去掉第13行的引用。我把这行代码做下修改，去掉引用：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>return hello.s;
+</code></pre></div></div>
+
+<p>再到终端运行一遍 infer 命令：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>infer -- clang -c Hello.m
+</code></pre></div></div>
+
+<p>发现只剩下了一个警告:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Hello.m:5: warning: ASSIGN_POINTER_WARNING
+  Property `s` is a pointer type marked with the `assign` attribute at line 5, column 1. Use a different attribute like `strong` or `weak`.
+  3.   @interface Hello : NSObject
+  4.
+  5. &gt; @property NSString* s;
+  6.
+  7.   @end
+</code></pre></div></div>
+
+<p>这个警告的意思是说，属性s是指针类型，需要使用 <code class="highlighter-rouge">strong</code> 或 <code class="highlighter-rouge">weak</code> 属性。这时，我将s 的属性修改为 strong：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>@property (nonatomic, strong) NSString *s;
+</code></pre></div></div>
+
+<p>运行 Infer 后，发现没有问题。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Capturing in make/cc mode...
+Found 1 source file to analyze in /Users/limengmeng/Desktop/Infer/Infer/infer-out
+
+
+Analysis finished in 2.759ss
+</code></pre></div></div>
+
+<h4 id="infer工作的流程">Infer工作的流程</h4>
+
+<p>Infer的工作原理是什么呢？<a href="https://infer.liaohuqiu.net/docs/infer-workflow.html">官方文档</a> 查看。</p>
+
+<p>Infer 工作的流程如下：</p>
+
+<ul>
+  <li>第一个阶段是转化阶段，将源代码转成 Infer 内部的中间语言。类 C语言使用 <code class="highlighter-rouge">Clang</code> 进行编译，Java语言使用<code class="highlighter-rouge"> javac</code> 进行编译，编译的同时转成中间语言，输出到<code class="highlighter-rouge"> infer-out</code> 目录。</li>
+  <li>第二个阶段是分析阶段，分析<code class="highlighter-rouge">infer-out</code> 目录下的文件。分析每个方法，如果出现错误的话会继续分析下一个方法，不会被中断，但是会记录下出错的位置，最后将所有出错的地方进行汇总输出。</li>
+  <li>运行时，Infer 默认会删除之前产生的 <code class="highlighter-rouge">infer-out/</code> 文件夹，这会导致非增量模式。可以通过 <code class="highlighter-rouge">--incremental</code>（或者 <code class="highlighter-rouge">-i</code>） 参数使用增量模式。增量模式下，运行infer命令不会删除 <code class="highlighter-rouge">infer-out</code> 文件夹，但是会利用这个文件夹进行 diff，减少分析量。</li>
+  <li>一般进行全新一轮分析时直接使用默认的非增量模式，而对于只想分析修改部分情况时，就使用增量模式。</li>
+</ul>
+
+<h4 id="infer分析-app">Infer分析 APP</h4>
+
+<p>如果你想分析整个项目的话，分析之前，记得清理项目。这样编译器才会重新编译所有文件，Infer 才会分析这些编译的文件（具体看 <a href="https://infer.liaohuqiu.net/docs/infer-workflow.html">这个章节</a>）。</p>
+
+:ET

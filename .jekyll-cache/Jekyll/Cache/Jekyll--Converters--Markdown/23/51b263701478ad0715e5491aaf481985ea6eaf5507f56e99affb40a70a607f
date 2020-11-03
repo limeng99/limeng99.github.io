@@ -1,0 +1,88 @@
+I"�<p>静态分析，是iOS开发者最常用到的一种代码调试技术。一款优秀的静态分析器，能够帮助我们更加全面的发现人工测试中的盲点，提高检查问题的效率，寻找潜在的可用性问题，比如空指针访问、资源和内存泄露等等。</p>
+
+<p>Xcode 自带的静态分析工具 Analyze，通过静态语法分析能够找出在代码层面就能发现的内存泄露问题，还可以通过上下文分析出是否存在变量无用等问题，但是，Analyze 的功能还是有限，还是无法帮助我们在编写代码的阶段发现更多的问题。所以，这才诞生出了功能更全、定制化高、效率高的第三方静态检查工具。比如，OCLint、Infer、Clang静态分析器等。</p>
+
+<p>其中Infer 在准确性、性能效率、规则、扩展性、易用性整体度上的把握是做得最好的，我认为这些是决定静态分析器好不好最重要的几点。所以，比较推荐的是使用 Infer 来进行代码静态分析。</p>
+
+<h4 id="infer安装">Infer安装</h4>
+
+<p>Infer是Facebook 开源的、使用 OCaml 语言编写的静态分析工具，可以对 C、Java 和 Objective-C 代码进行静态分析，可以检查出空指针访问、资源泄露以及内存泄露。</p>
+
+<p>官网的安装教程：<a href="https://infer.liaohuqiu.net/docs/getting-started.html">安装教程</a></p>
+
+<p>使用homebrew安装：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>brew install infer
+</code></pre></div></div>
+
+<h4 id="infer示例">Infer示例</h4>
+
+<p>以下是一个简单的 Objective-C 例子：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// Hello.m
+#import &lt;Foundation/Foundation.h&gt;
+
+@interface Hello: NSObject
+@property NSString* s;
+@end
+
+@implementation Hello
+NSString* m() {
+    Hello* hello = nil;
+    return hello-&gt;_s;
+}
+@end
+</code></pre></div></div>
+
+<p>在 <code class="highlighter-rouge">Hello.m</code> 同级目录，运行：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>infer -- clang -c Hello.m
+</code></pre></div></div>
+
+<p>结果如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Capturing in make/cc mode...
+Found 1 source file to analyze in /Users/limeng/Desktop/Infer/Infer/infer-out
+
+
+Analysis finished in 3.471ss
+
+Found 3 issues
+
+Hello.m:13: error: NULL_DEREFERENCE
+  pointer `hello` last assigned on line 12 could be null and is dereferenced at line 13, column 12.
+  11.   NSString* m() {
+  12.       Hello* hello = nil;
+  13. &gt;     return hello-&gt;_s;
+  14.   }
+  15.   @end
+
+Hello.m:13: warning: DIRECT_ATOMIC_PROPERTY_ACCESS
+  Direct access to ivar `_s` of an atomic property at line 13, column 12. Accessing an ivar of an atomic property makes the property nonatomic.
+  11.   NSString* m() {
+  12.       Hello* hello = nil;
+  13. &gt;     return hello-&gt;_s;
+  14.   }
+  15.   @end
+
+Hello.h:14: warning: ASSIGN_POINTER_WARNING
+  Property `s` is a pointer type marked with the `assign` attribute at line 14, column 1. Use a different attribute like `strong` or `weak`.
+  12.   @interface Hello : NSObject
+  13.
+  14. &gt; @property NSString* s;
+  15.
+  16.   @end
+
+
+Summary of the reports
+
+               NULL_DEREFERENCE: 1
+  DIRECT_ATOMIC_PROPERTY_ACCESS: 1
+         ASSIGN_POINTER_WARNING: 1
+</code></pre></div></div>
+
+<p>可以看出，我们前面的 <code class="highlighter-rouge">Hello.m</code> 代码里一共有五个问题，其中包括一个错误、四个警告。第一个错误如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+</code></pre></div></div>
+:ET
