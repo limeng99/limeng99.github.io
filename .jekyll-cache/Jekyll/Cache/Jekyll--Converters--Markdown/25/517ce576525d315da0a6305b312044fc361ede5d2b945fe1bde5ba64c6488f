@@ -1,0 +1,37 @@
+I"�	<p>在iOS开发中，埋点可以解决两大类问题：一是了解用户使用App的行为，二是降低分析线上问题的难度。目前，iOS开发中常见的埋点方式，主要包括代码埋点、可视化埋点和无埋点这三种。</p>
+
+<p>其中，可视化埋点和无埋点，都属于是无侵入的埋点方案，因为它们都不需要在工程代码中写入埋点代码。所以，采用这样的无侵入埋点方案，既可以做到埋点被统一维护，又可以实现和工程代码的解耦。</p>
+
+<p>最常见的三种埋点类型有页面进入次数、页面停留时间、点击事件。对于这三种常见的情况，我们都可以通过<code class="highlighter-rouge">runtime</code>的<code class="highlighter-rouge">method swizzling</code>来插入埋点代码，以实现无侵入的埋点方法，可分三步来处理：实现替换、生成唯一标识、数据上报。</p>
+
+<h4 id="页面进入次数页面停留时间事件">页面进入次数、页面停留时间事件</h4>
+
+<p>页面进入次数、页面停留时间需要对<code class="highlighter-rouge">UIViewController</code>生命周期进行埋点，可以创建一个<code class="highlighter-rouge">UIViewController</code>的<code class="highlighter-rouge">Category</code>，通过<code class="highlighter-rouge">method swizzling</code>将原生方法替换，代码如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>+ (void)load
+{
+    // viewWillAppear方法交换
+    Method viewWillAppearOriginalMethod = class_getInstanceMethod([self class], @selector(viewWillAppear:));
+    Method viewWillAppearSwizzledMethod = class_getInstanceMethod([self class], @selector(vi_viewWillAppear:));
+    method_exchangeImplementations(viewWillAppearOriginalMethod, viewWillAppearSwizzledMethod);
+    
+    // viewDidDisappear方法交换
+    Method viewDidDisappearOriginalMethod = class_getInstanceMethod([self class], @selector(viewDidDisappear:));
+    Method viewDidDisappearSwizzledMethod = class_getInstanceMethod([self class], @selector(vi_viewDidDisappear:));
+    method_exchangeImplementations(viewDidDisappearOriginalMethod, viewDidDisappearSwizzledMethod);
+}
+
+- (void)hook_viewWillAppear:(BOOL)animated
+{
+    [self hook_viewWillAppear:animated];
+    // 进行日志的埋点
+}
+
+- (void)vi_viewDidDisappear:(BOOL)animated
+{
+    [self vi_viewDidDisappear:animated];
+    // 进行日志的埋点
+}
+</code></pre></div></div>
+
+:ET

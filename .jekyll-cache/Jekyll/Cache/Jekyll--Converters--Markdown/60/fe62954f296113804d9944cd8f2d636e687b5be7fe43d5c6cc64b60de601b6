@@ -1,0 +1,97 @@
+I"`<p>在iOS开发中，埋点可以解决两大类问题：一是了解用户使用App的行为，二是降低分析线上问题的难度。目前，iOS开发中常见的埋点方式，主要包括代码埋点、可视化埋点和无埋点这三种。</p>
+
+<p>其中，可视化埋点和无埋点，都属于是无侵入的埋点方案，因为它们都不需要在工程代码中写入埋点代码。所以，采用这样的无侵入埋点方案，既可以做到埋点被统一维护，又可以实现和工程代码的解耦。</p>
+
+<p>最常见的三种埋点类型有页面进入次数、页面停留时间、点击事件。对于这三种常见的情况，我们都可以通过<code class="highlighter-rouge">runtime</code>的<code class="highlighter-rouge">method swizzling</code>来插入埋点代码，以实现无侵入的埋点方法，可分三步来处理：实现替换、生成唯一标识、数据上报。</p>
+
+<h4 id="运行时方法替换方式进行埋点">运行时方法替换方式进行埋点</h4>
+
+<p>具体的实现方法是：先写一个运行时方法替换的类<code class="highlighter-rouge">LMHook</code>，加上替换的方法 <code class="highlighter-rouge">hookClass:fromSelector:toSelector</code>，代码如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>#import "LMHook.h"
+#import &lt;objc/runtime.h&gt;
+
+@implementation LMHook
+
++ (void)hookClass:(Class)classObject fromSelector:(SEL)fromSelector toSelector:(SEL)toSelector {
+    Class class = classObject;
+    // 得到被替换类的实例方法
+    Method fromMethod = class_getInstanceMethod(class, fromSelector);
+    // 得到替换类的实例方法
+    Method toMethod = class_getInstanceMethod(class, toSelector);
+    
+    // class_addMethod 返回成功表示被替换的方法没实现，然后会通过 class_addMethod 方法先实现；
+    // 返回失败则表示被替换方法已存在，可以直接进行 IMP 指针交换
+    if(class_addMethod(class, fromSelector, method_getImplementation(toMethod), method_getTypeEncoding(toMethod))) {
+        // 进行方法的替换
+        class_replaceMethod(class, toSelector, method_getImplementation(fromMethod), method_getTypeEncoding(fromMethod));
+    } else {
+        // 交换 IMP 指针
+        method_exchangeImplementations(fromMethod, toMethod);
+    }
+}
+
+@end
+</code></pre></div></div>
+
+<h4 id="页面进入次数页面停留时间事件">页面进入次数、页面停留时间事件</h4>
+
+<p>页面进入次数、页面停留时间需要对<code class="highlighter-rouge">UIViewController</code>生命周期进行埋点，可以创建一个<code class="highlighter-rouge">UIViewController</code>的<code class="highlighter-rouge">Category</code>，通过<code class="highlighter-rouge">method swizzling</code>将原生方法替换，代码如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>@implementation UIViewController (AOP)
+
++ (void)load {
+    // viewWillAppear方法交换
+    [LMHook hookClass:self fromSelector:@selector(viewWillAppear:) toSelector:@selector(hook_viewWillAppear:)];
+    
+    // viewDidDisappear方法交换
+    [LMHook hookClass:self fromSelector:@selector(viewDidDisappear:) toSelector:@selector(hook_viewDidDisappear:)];
+}
+
+- (void)hook_viewWillAppear:(BOOL)animated {
+    [self hook_viewWillAppear:animated];
+    // 进行日志的埋点
+    // event= enter_view &amp; current_url = NSStringFromClass([self class])
+}
+
+- (void)hook_viewDidDisappear:(BOOL)animated {
+    [self hook_viewDidDisappear:animated];
+    // 进行日志的埋点
+    // event= leave_view &amp; current_url = NSStringFromClass([self class])
+}
+
+@end
+</code></pre></div></div>
+
+<p>我们要怎么区别不同的 <code class="highlighter-rouge">UIViewController</code> 呢？我一般采取的做法都是，使用<code class="highlighter-rouge">NSStringFromClass([self class])</code> 方法来取类名。这样，我就能够通过类名来区别不同的<code class="highlighter-rouge">UIViewController</code>了。根据也无需求，我们可在内部判断排除<code class="highlighter-rouge">UINavigationController</code>，<code class="highlighter-rouge">UITabBarController</code>，<code class="highlighter-rouge">UICompatibilityInputViewController(键盘弹出)</code>这些<code class="highlighter-rouge">UIViewController</code>的子类的统计.</p>
+
+<h4 id="uicontrol点击事件">UIControl点击事件</h4>
+
+<p>对于<code class="highlighter-rouge">UIControl</code>及其子类点击事件来说，我们也可以通过运行时方法替换的方式进行无侵入埋点。这里最主要的工作是，找到这个点击事件的方法 <code class="highlighter-rouge">sendAction:to:forEvent:</code>，然后在 <code class="highlighter-rouge">+load()</code> 方法使用 <code class="highlighter-rouge">LMHook</code> 替换成为你定义的方法。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>@implementation UIControl (AOP)
+
++ (void)load {
+   	// sendAction:to:forEvent:方法交换
+    [LMHook hookClass:self fromSelector:@selector(sendAction:to:forEvent:) toSelector:@selector(hook_sendAction:to:forEvent:)];
+}
+
+- (void)hook_sendAction:(SEL)action to:(id)target forEvent:(UIEvent *)event {
+    [self hook_sendAction:action to:target forEvent:event];
+    // 进行日志的埋点
+    // current_url = display controller 当前显示的controller
+    // target_class = NSStringFromClass([target class])
+    // click_class = NSStringFromClass([self class])
+    // click_id = NSStringFromSelector(action)
+    // ...
+}
+
+@end
+</code></pre></div></div>
+
+<p>我们可以获取以上信息进行统计，如果你想获取更多信息，可以判断控件是否有<code class="highlighter-rouge">title、backgroundImage、image</code>，对图片名称获取可通过对<code class="highlighter-rouge">UIImage</code>使用<code class="highlighter-rouge">hook + association</code>技术获取对应的信息。</p>
+
+<h4 id="uigesturerecognizer手势事件">UIGestureRecognizer手势事件</h4>
+
+<p><code class="highlighter-rouge">UIGestureRecognizer</code>也进行事件统计，我们也可以通过运行时方法替换的方式进行无侵入埋点。找到方法 <code class="highlighter-rouge">sendAction:to:forEvent:</code>，然后在 <code class="highlighter-rouge">+load()</code> 方法使用 <code class="highlighter-rouge">LMHook</code> 替换成为你定义的方法。</p>
+:ET
