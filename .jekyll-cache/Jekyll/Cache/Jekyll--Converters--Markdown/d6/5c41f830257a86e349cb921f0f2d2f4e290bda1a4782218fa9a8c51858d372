@@ -96,7 +96,7 @@ $ git merge --no-ff -m "合并信息" 分支名称
 $ git merge --abort
 
 删除远程的一个分支
-$ git push —-delete origin 分支名字
+$ git push origin —-delete 分支名字
 
 推送一个空分支到远程，相当于删除远程的一个分支
 $ git push origin :refs/heads/分支名字
