@@ -1,20 +1,23 @@
-I"�"<h4 id="一git基本命令">一、git基本命令</h4>
+I"�$<h4 id="一git基本命令">一、git基本命令</h4>
 
 <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>配置user信息
-git config --global user.name '设置用户名'
-git config --global user.email '设置邮箱'
+$ git config --global user.name '设置用户名'
+$ git config --global user.email '设置邮箱'
 
 查看当前config的配置
-git config --list --global
+$ git config --list --global
 
 在当前目录下新建一个git仓库
 $ git init
 
 克隆一个远端库
-$ git clone 仓库地址
+$ git clone &lt;仓库地址&gt;
 
 把文件添加到仓库
 $ git add 文件
+
+删除文件，rm命令默认已经提交暂存区，执行后可直接commit
+$ git rm file
 
 提交文件
 $ git commit -m "提交的信息"
@@ -31,6 +34,7 @@ $ git pull origin master
 
 查看仓库当前状态
 $ git status
+$ git status -s  状态简洁输出
 
 查看最近更改内容
 $ git diff
@@ -51,9 +55,10 @@ $ git reflog
 $ git checkout -- file
 
 当你不但改乱了工作区某个文件的内容，还添加到了暂存区时，
-想丢弃修改，分两步，第一步用命令
+想丢弃修改，分两步，
+第一步用命令，文件移出暂存区
 $ git reset HEAD file
-然后再
+然后再，丢弃修改
 $ git checkout -- file
 
 关联一个本地仓库到未初始化的远程仓库，例如GitHub仓库上
@@ -84,6 +89,9 @@ $ git checkout -b 分支名字
 
 将本地分支推送到远程服务器
 $ git push --set-upstream origin 分支名字
+
+选择一个commit节点，合并进当前分支
+$ git cherry-pick [commit节点]
 
 合并分支
 $ git merge 分支名字
@@ -146,8 +154,16 @@ $ git push origin :refs/tags/标签名字
 <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>获取远程仓库所有的变动
 $ git fetch
 
-查看远程库信息
+添加远程仓库，shortname-指定引用简写
+$ git remote add &lt;shortname&gt; &lt;url&gt;
+
+查看远程仓库信息
+$ git remote
 $ git remote -v
+$ git remote show origin // 展示git remote输出详细信息
+
+移除无效远程仓库
+$ git remote rm &lt;git remote查看仓库简写&gt;
 
 获取所有本地分支和远程分支
 $ git branch -a

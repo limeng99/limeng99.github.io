@@ -1,0 +1,303 @@
+I"�%<h4 id="一git基本命令">一、git基本命令</h4>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>配置user信息
+$ git config --global user.name '设置用户名'
+$ git config --global user.email '设置邮箱'
+
+查看当前config的配置
+$ git config --list --global
+
+在当前目录下新建一个git仓库
+$ git init
+
+克隆一个远端库
+$ git clone &lt;仓库地址&gt;
+
+添加远程仓库，shortname-指定引用简写
+$ git remote add &lt;shortname&gt; &lt;url&gt;
+
+把文件添加到仓库
+$ git add 文件
+
+删除文件，rm命令默认已经提交暂存区，执行后可直接commit
+$ git rm file
+
+提交文件
+$ git commit -m "提交的信息"
+
+提交到代码到远程
+$ git push origin 分支名称
+提交代码到远程主干
+$ git push origin master
+
+拉取远程分支到本地
+$ git pull origin 分支名称
+拉取远程主干分支到本地
+$ git pull origin master
+强制拉取，当本地创建仓库与远程仓库文件重名时，报错；如想强制覆盖，执行以下命令
+$ git pull origin master --allow-unrelated-histories
+
+查看仓库当前状态
+$ git status
+$ git status -s  状态简洁输出
+
+查看最近更改内容
+$ git diff
+
+显示最近到最远的提交日志
+$ git log
+$ git log --graph  看到分支合并图
+$ git log --pretty=oneline 简化日志输出信息
+
+恢复到上一个提交版本
+HEAD当前版本，HEAD^上一个版本，HEAD^^上上个版本，HEAD~100表示往上100个版本
+$ git reset --hard HEAD^(提交ID)
+
+查看命令历史以便回到未来
+$ git reflog
+
+当你改乱了工作区某个文件的内容，想直接丢弃工作区的修改时，用命令
+$ git checkout -- file
+
+当你不但改乱了工作区某个文件的内容，还添加到了暂存区时，
+想丢弃修改，分两步，
+第一步用命令，文件移出暂存区
+$ git reset HEAD file
+然后再，丢弃修改
+$ git checkout -- file
+
+关联一个本地仓库到未初始化的远程仓库，例如GitHub仓库上
+$ git remote add origin git@github.com:&lt;name&gt;/&lt;name&gt;.git
+
+本地库的内容推送到远程
+$ git push -u origin 分支名称
+</code></pre></div></div>
+<h4 id="二分支">二、分支</h4>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>查看分支，*开头表示当前分支
+$ git branch  // 查看本地分支
+$ git branch -r // 查看远程分支
+$ git branch -a // 查看所有分支
+
+创建分支
+$ git branch 分支名字
+
+删除分支，-D为强制删除
+$ git branch -d 分支名字
+$ git branch -D 分支名字
+
+分支切换
+$ git checkout 分支名字
+
+切换到master主干
+$ git checkout master
+
+创建一个分支并切换到此分支
+$ git checkout -b 分支名字
+
+将本地分支推送到远程服务器
+$ git push --set-upstream origin 分支名字
+
+选择一个commit节点，合并进当前分支
+$ git cherry-pick [commit节点]
+
+合并分支
+$ git merge 分支名字
+$ git merge test  表示test合并到master
+
+合并分支，禁用Fast forward
+$ git merge --no-ff -m "合并信息" 分支名称
+
+放弃合并分支
+$ git merge --abort
+
+删除远程的一个分支
+$ git push origin —-delete 分支名字
+
+推送一个空分支到远程，相当于删除远程的一个分支
+$ git push origin :refs/heads/分支名字
+
+删除远程不存在的本地分支
+$ git fetch -p
+
+删除远程分支报错可能是此分支为工程默认分支
+解决办法：
+1.进入 github 中该项目的 Settings 页面
+2.设置 Default Branch 为其他的分支（例如 master）
+3.重新执行删除远程分支命令
+</code></pre></div></div>
+<h4 id="三标签">三、标签</h4>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>创建标签
+$ git tag v1.0(名字随便写)
+
+查看所有标签
+$ git tag
+
+指定的提交上打标签
+$ git tag v0.2 commit_id
+
+查看标签信息
+$ git show v0.1
+
+指定标签信息
+$ git tag -a 标签名字 -m "标签说明" &lt;commit id&gt;
+
+把本地所有的tag推送到远程
+$ git push origin --tags
+
+推送一个本地标签到远程
+$ git push origin 标签名字
+
+获取远程tag
+$ git fetch origin tag 标签名字
+
+删除标签
+$ git tag -d v0.1
+
+如果一个标签已经推送到远程再删除就先删除本地标签再删除远端标签
+$ git tag -d v0.1
+$ git push origin :refs/tags/标签名字
+</code></pre></div></div>
+<h4 id="四远程仓库操作">四、远程仓库操作</h4>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>查看远程仓库信息
+$ git remote
+$ git remote -v
+$ git remote show origin // 展示git remote输出详细信息
+
+移除无效远程仓库
+$ git remote rm &lt;git remote查看仓库简写&gt;
+
+获取远程仓库抓取
+$ git fetch
+
+将抓取的文件合并 
+$ git merge &lt;origin master&gt;  // pull命令相当于 fetch + merge
+
+获取所有本地分支和远程分支
+$ git branch -a
+
+获取一个远程分支到本地
+$ git checkout -b &lt;本地分支名字&gt; origin/&lt;远程分支名字&gt;
+
+本地分支关联到一个远程分支
+$ git branch --set-upstream-to=origin/&lt;远程分支&gt; &lt;本地分支&gt;
+
+推送本地的分支到远程origin的分支(没有会自动创建)
+$ git push origin &lt;本地分支&gt;:&lt;远程分支&gt;
+
+强制推送本地提交到服务器
+$ git push -f origin master
+
+git查看本地分支关联（跟踪）的远程分支之间的对应关系，本地分支对应哪个远程分支
+$ git branch -vv
+</code></pre></div></div>
+<h4 id="五添加git忽略文件gitignore">五、添加git忽略文件.gitignore</h4>
+<p>在git中如果想忽略掉某个文件，不让这个文件提交到版本库中，可以在根目录中添加<code class="highlighter-rouge"> .gitignore </code>文件。</p>
+
+<p>包含CocoaPods的iOS项目<code class="highlighter-rouge">.gitignore</code>写法</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code># Xcode
+.DS_Store
+*/build/*
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata
+profile
+*.moved-aside
+DerivedData
+.idea/
+*.hmap
+*.xccheckout
+*.xcworkspace
+!default.xcworkspace
+
+#CocoaPods
+Pods
+!Podfile
+!Podfile.lock
+</code></pre></div></div>
+
+<p>但是有时候会不生效，原因是.gitignore只能忽略那些原来没有被track的文件，如果某些文件已经被纳入了版本管理中，则修改.gitignore是无效的。那么解决方法就是先把本地缓存删除（改变成未track状态），然后再提交：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ git rm -r --cached .
+$ git add .
+$ git commit -m 'update .gitignore'
+</code></pre></div></div>
+<p>GitHub各种配置忽略文件 <a href="https://github.com/github/gitignore">.gitignore</a></p>
+
+<h4 id="六关于fork的一些命令">六、关于Fork的一些命令</h4>
+
+<p>有时候Fork完原作者仓库之后，需要跟远程仓库更新同步一下，那么就需要以下几步操作</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1.首先 把作者的仓库添加到自己的上游远程，通常命名为 upstream，操作一次就可以了
+$ git remote add upstream git@github.com:xxx/xxx.git
+
+2.查看远程主机状态，可以看到一个origin是你的，另外一个upstream是原作者的
+$ git remote -v
+
+3.拉取原作者的仓库更新
+$ git fetch upstream
+
+4.merge或者rebase到自己的的分支上
+$ git merge upstream/&lt;对应分支&gt;
+
+5.最后推送到自己的远程仓库就行了
+$ git push
+</code></pre></div></div>
+<h4 id="七创建ssh-key">七、创建SSH Key</h4>
+<p>有些 Git 服务器都会选择使用 SSH 公钥来进行授权，这样就需要配置SSH Key。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1.SSH公钥默认储存在账户的主目录下的 ~/.ssh 目录
+$ cd ~/.ssh
+
+2.查看 ~/.ssh 目录所有文件，查看是否有 id_rsa(私钥) 和 id_rsa.pub(公钥)
+$ ls
+
+3.无 id_dsa 相关文件，则使用 ssh-keygen 创建
+$ ssh-keygen -t rsa -C "youremail@example.com"
+
+4.查看公钥 id_rsa.pub
+$ cat ~/.ssh/id_rsa.pub
+
+5.多个ssh, 将公钥保存不同文件中, 如下 github_id_rsa &amp; gitlab_id_rsa
+$ ssh-keygen -t rsa -C "youremail@github.com"  -f ~/.ssh/github_id_rsa
+$ ssh-keygen -t rsa -C "youremail@gitlab.com"  -f ~/.ssh/gitlab_id_rsa
+
+6.查看不同公钥
+$ cat ~/.ssh/github_id_rsa.pub
+$ cat ~/.ssh/gitlab_id_rsa.pub
+
+7.在 ~/.ssh 目录配置config文件
+# gitlab
+Host gitlab.com
+HostName gitlab.com
+PreferredAuthentications publickey
+IdentityFile ~/.ssh/gitlab_id_rsa
+
+# github
+Host github.com
+HostName github.com
+PreferredAuthentications publickey
+IdentityFile ~/.ssh/github_id_rsa
+
+8.查看是否连接成功
+$ ssh -T youremail@github.com
+$ ssh -T youremail@gitlab.com
+同时在 ~/.ssh 目录下回生成know_hosts文件来区分不同的ssh, 使用ssh来push和pull
+</code></pre></div></div>
+<h4 id="八配置git别名">八、配置Git别名</h4>
+
+<p>举个例子，比如吧git status 配置成 git st</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ git config --global alias.st status
+</code></pre></div></div>
+<p>git log 配置多功能提示效果</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ git config --global alias.lg "log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)&lt;%an&gt;%Creset' --abbrev-commit"
+</code></pre></div></div>
+
+<p>推荐Git教程 ：<a href="http://www.liaoxuefeng.com/wiki/0013739516305929606dd18361248578c67b8067c8c017b000">廖雪峰Git教程</a></p>
+
+:ET
